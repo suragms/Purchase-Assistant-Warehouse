@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using PurchaseAssistant.Application.Interfaces;
+using PurchaseAssistant.Infrastructure.Services;
 using PurchaseAssistant.Infrastructure.Data;
 using PurchaseAssistant.Infrastructure.Auth;
 using PurchaseAssistant.Web.Authorization;
@@ -12,6 +13,8 @@ using PurchaseAssistant.Web.Services;
 using System.Text;
 using System.Reflection;
 using PurchaseAssistant.Domain.Constants;
+using PurchaseAssistant.Domain.Entities;
+using PurchaseAssistant.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
@@ -35,6 +38,13 @@ builder.Services.Configure<JwtOptions>(options =>
 
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IJwtProvider, JwtProvider>();
+builder.Services.AddScoped<IEntityNormalizationService, EntityNormalizationService>();
+builder.Services.AddScoped<ICategoryService, CategoryService>();
+builder.Services.AddScoped<ICategoryTypeService, CategoryTypeService>();
+builder.Services.AddScoped<ICatalogService, CatalogService>();
+builder.Services.AddScoped<ISupplierService, SupplierService>();
+builder.Services.AddScoped<IBrokerService, BrokerService>();
+builder.Services.AddScoped<IGlobalSearchService, GlobalSearchService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<ICurrentUserService>(sp => sp.GetRequiredService<CurrentUserService>());
@@ -44,6 +54,7 @@ builder.Services.AddScoped<ITenantProvider>(sp => sp.GetRequiredService<CurrentU
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+    options.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
 });
 
 // Authentication
@@ -70,13 +81,26 @@ builder.Services.AddAuthorization(options =>
     // Define commonly used policies safely
     options.AddPolicy("RequireUsersView", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.UsersView)));
     options.AddPolicy("RequireUsersManage", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.UsersManage)));
+    options.AddPolicy("RequireCatalogView", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.CatalogView)));
+    options.AddPolicy("RequireCatalogCreate", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.CatalogCreate)));
+    options.AddPolicy("RequireCatalogEdit", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.CatalogEdit)));
+    options.AddPolicy("RequireCatalogArchive", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.CatalogArchive)));
+    options.AddPolicy("RequireSupplierView", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.SupplierView)));
+    options.AddPolicy("RequireSupplierCreate", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.SupplierCreate)));
+    options.AddPolicy("RequireSupplierEdit", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.SupplierEdit)));
+    options.AddPolicy("RequireSupplierDelete", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.SupplierDelete)));
+    options.AddPolicy("RequireBrokerView", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.BrokerView)));
+    options.AddPolicy("RequireBrokerCreate", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.BrokerCreate)));
+    options.AddPolicy("RequireBrokerEdit", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.BrokerEdit)));
+    options.AddPolicy("RequireBrokerDelete", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.BrokerDelete)));
 });
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", b =>
     {
-        b.WithOrigins("http://localhost:5173", "http://localhost:3000") // standard vite/cra ports
+        b.WithOrigins("http://localhost:5173", "http://localhost:5174", "http://localhost:3000")
+         .SetIsOriginAllowed(origin => new Uri(origin).Host == "localhost")
          .AllowAnyHeader()
          .AllowAnyMethod()
          .AllowCredentials();
@@ -120,5 +144,59 @@ app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+// Ensure Database is migrated and seeded with default admin
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+
+    try
+    {
+        await db.Database.MigrateAsync();
+
+        if (!await db.Users.AnyAsync())
+        {
+            var business = new Business
+            {
+                Id = Guid.NewGuid(),
+                Name = "Main Warehouse",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            db.Businesses.Add(business);
+
+            var adminUser = new User
+            {
+                Id = Guid.NewGuid(),
+                Name = "Admin User",
+                Email = "admin@warehouse.local",
+                PasswordHash = hasher.HashPassword("Password123!"),
+                Status = UserStatus.Active,
+                CreatedAt = DateTime.UtcNow
+            };
+            db.Users.Add(adminUser);
+
+            var membership = new Membership
+            {
+                Id = Guid.NewGuid(),
+                BusinessId = business.Id,
+                UserId = adminUser.Id,
+                Role = Role.Admin,
+                PermissionsJson = JsonSerializer.Serialize(new[] { "users.view", "users.manage", "catalog.view", "catalog.manage", "stock.view", "stock.manage", "purchases.view", "purchases.manage" }),
+                CreatedAt = DateTime.UtcNow
+            };
+            db.Memberships.Add(membership);
+
+            await db.SaveChangesAsync();
+            Console.WriteLine("Seeded initial business and admin (admin@warehouse.local / Password123!)");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"DB Migration/Seed Warning: {ex.Message}");
+    }
+}
 
 app.Run();

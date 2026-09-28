@@ -21,6 +21,10 @@ namespace PurchaseAssistant.Infrastructure.Data
         public DbSet<Category> Categories => Set<Category>();
         public DbSet<CategoryType> CategoryTypes => Set<CategoryType>();
         public DbSet<CatalogItem> CatalogItems => Set<CatalogItem>();
+        public DbSet<CatalogVariant> CatalogVariants => Set<CatalogVariant>();
+        public DbSet<SupplierItem> SupplierItems => Set<SupplierItem>();
+        public DbSet<BrokerSupplier> BrokerSuppliers => Set<BrokerSupplier>();
+        public DbSet<SupplierItemPrice> SupplierItemPrices => Set<SupplierItemPrice>();
         public DbSet<Supplier> Suppliers => Set<Supplier>();
         public DbSet<Broker> Brokers => Set<Broker>();
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
@@ -37,6 +41,10 @@ namespace PurchaseAssistant.Infrastructure.Data
             modelBuilder.Entity<Category>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
             modelBuilder.Entity<CategoryType>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
             modelBuilder.Entity<CatalogItem>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
+            modelBuilder.Entity<CatalogVariant>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
+            modelBuilder.Entity<SupplierItem>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
+            modelBuilder.Entity<BrokerSupplier>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
+            modelBuilder.Entity<SupplierItemPrice>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
             modelBuilder.Entity<Supplier>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
             modelBuilder.Entity<Broker>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
             modelBuilder.Entity<SecurityAuditLog>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
