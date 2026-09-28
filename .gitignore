@@ -1,0 +1,49 @@
+# .NET Core & C#
+**/[Bb]in/
+**/[Oo]bj/
+.vs/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.pidb
+*.booproj
+*.sln.docstates
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# Node.js & Frontend
+**/node_modules/
+**/dist/
+**/dist-ssr/
+.vite/
+.output/
+*.tsbuildinfo
+.npm/
+.eslintcache
+
+# Logs & Debug
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment & Local Secrets
+.env
+.env.local
+.env.*.local
+*.local
+
+# OS Metadata
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# IDEs & Editors
+.idea/
+*.swp
+*~
