@@ -2,42 +2,58 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '../auth/AuthProvider';
 import { ProtectedRoute } from '../auth/Guards';
+import { ToastProvider } from '../components/ui/ToastProvider';
+import { AppShell } from '../layouts/AppShell';
 import Login from '../pages/auth/Login';
 
-// Placeholder layouts
-const AppShell = () => (
-    <div className="flex flex-col h-screen">
-        <header className="h-16 bg-[#0E4F46] text-white flex items-center px-4">
-            <h1 className="font-bold">Purchase Assistant ERP</h1>
-        </header>
-        <div className="flex-1 flex overflow-hidden">
-            <aside className="w-64 bg-white border-r border-[#E2E8E6] p-4 hidden md:block">
-                Navigation
-            </aside>
-            <main className="flex-1 bg-[#F7F9F6] p-6 overflow-y-auto">
-                <React.Suspense fallback={<div>Loading...</div>}>
-                   <div id="portal-root">Welcome to the Dashboard!</div>
-                </React.Suspense>
-            </main>
-        </div>
-    </div>
-);
+// Placeholder empty components for lazy loading
+const Dashboard = React.lazy(() => import('../pages/Dashboard'));
+const CatalogList = React.lazy(() => import('../pages/catalog/CatalogList'));
+const CatalogForm = React.lazy(() => import('../pages/catalog/CatalogForm'));
+const CatalogDetail = React.lazy(() => import('../pages/catalog/CatalogDetail'));
+const CategoryList = React.lazy(() => import('../pages/catalog/CategoryList'));
+const TypeList = React.lazy(() => import('../pages/catalog/TypeList'));
+const BarcodeManager = React.lazy(() => import('../pages/catalog/BarcodeManager'));
+const DuplicateReview = React.lazy(() => import('../pages/catalog/DuplicateReview'));
+const SupplierList = React.lazy(() => import('../pages/suppliers/SupplierList'));
+const BrokerList = React.lazy(() => import('../pages/brokers/BrokerList'));
 
 export const AppRouter = () => {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/" element={<ProtectedRoute />}>
-             <Route element={<AppShell />}>
-                 <Route index element={<Navigate to="/dashboard" replace />} />
-                 <Route path="dashboard" element={<div>Dashboard Metrics Overview</div>} />
-                 {/* Extend routes here dynamically for purchases, inventory etc in Phase 3 */}
-             </Route>
-          </Route>
-        </Routes>
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+
+            <Route path="/" element={<ProtectedRoute />}>
+              <Route element={<AppShell />}>
+                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route path="dashboard" element={<Dashboard />} />
+
+                {/* Catalog Scope */}
+                <Route path="catalog/items" element={<CatalogList />} />
+                <Route path="catalog/items/new" element={<CatalogForm />} />
+                <Route path="catalog/items/:id" element={<CatalogDetail />} />
+                <Route path="catalog/items/:id/edit" element={<CatalogForm edit />} />
+                <Route path="catalog/categories" element={<CategoryList />} />
+                <Route path="catalog/types" element={<TypeList />} />
+                <Route path="catalog/barcodes" element={<BarcodeManager />} />
+                <Route path="catalog/duplicates" element={<DuplicateReview />} />
+
+                {/* Suppliers & Brokers */}
+                <Route path="suppliers" element={<SupplierList />} />
+                <Route path="brokers" element={<BrokerList />} />
+
+                {/* Stubs */}
+                <Route path="inventory" element={<div className="p-4">Phase 4 Placeholder</div>} />
+                <Route path="users" element={<div className="p-4">Phase 2 Users Interface</div>} />
+              </Route>
+            </Route>
+
+          </Routes>
+        </AuthProvider>
+      </ToastProvider>
     </BrowserRouter>
   );
 };

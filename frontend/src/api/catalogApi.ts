@@ -62,9 +62,19 @@ export interface GlobalSearchResponse {
   categories: Category[];
 }
 
+export interface PaginatedResult<T> {
+  data: T[];
+  meta: {
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    totalPages: number;
+  };
+}
+
 export const catalogApi = {
   // Catalog Items
-  getItems: async (page = 1, pageSize = 50, search?: string, categoryId?: string) => {
+  getItems: async (page = 1, pageSize = 50, search?: string, categoryId?: string): Promise<PaginatedResult<CatalogItem>> => {
     const params = new URLSearchParams();
     params.append('page', page.toString());
     params.append('pageSize', pageSize.toString());
