@@ -32,6 +32,7 @@ namespace PurchaseAssistant.Infrastructure.Data
         public DbSet<StockMovement> StockMovements => Set<StockMovement>();
         public DbSet<PurchaseOrder> Purchases => Set<PurchaseOrder>();
         public DbSet<PurchaseItem> PurchaseItems => Set<PurchaseItem>();
+        public DbSet<Notification> Notifications => Set<Notification>();
 
         public Guid CurrentBusinessId => _tenantProvider?.GetBusinessId() ?? Guid.Empty;
 
@@ -54,6 +55,7 @@ namespace PurchaseAssistant.Infrastructure.Data
             modelBuilder.Entity<StockMovement>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
             modelBuilder.Entity<PurchaseOrder>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
             modelBuilder.Entity<PurchaseItem>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
+            modelBuilder.Entity<Notification>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
         }
     }
 }

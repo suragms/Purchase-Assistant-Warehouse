@@ -63,3 +63,15 @@ export const purchaseKeys = {
   list: (filters: Record<string, unknown>) => [...purchaseKeys.lists(), filters] as const,
   detail: (id: string) => [...purchaseKeys.all, 'detail', id] as const,
 };
+
+export const dashboardKeys = {
+  all: ['dashboard'] as const,
+  summary: () => [...dashboardKeys.all, 'summary'] as const,
+};
+
+export const notificationKeys = {
+  all: ['notifications'] as const,
+  lists: () => [...notificationKeys.all, 'list'] as const,
+  list: (filters?: Record<string, unknown>) => [...notificationKeys.lists(), filters ?? {}] as const,
+  unreadCount: () => [...notificationKeys.all, 'unread-count'] as const,
+};
