@@ -46,6 +46,7 @@ builder.Services.AddScoped<ISupplierService, SupplierService>();
 builder.Services.AddScoped<IBrokerService, BrokerService>();
 builder.Services.AddScoped<IGlobalSearchService, GlobalSearchService>();
 builder.Services.AddScoped<IStockService, StockService>();
+builder.Services.AddScoped<IPurchaseService, PurchaseService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<ICurrentUserService>(sp => sp.GetRequiredService<CurrentUserService>());
@@ -98,6 +99,12 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("RequireStockAdjust", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.StockAdjust)));
     options.AddPolicy("RequireStockPhysical", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.StockPhysical)));
     options.AddPolicy("RequireStockSystem", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.StockSystem)));
+    options.AddPolicy("RequirePurchaseView", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.PurchaseView)));
+    options.AddPolicy("RequirePurchaseCreate", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.PurchaseCreate)));
+    options.AddPolicy("RequirePurchaseEdit", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.PurchaseEdit)));
+    options.AddPolicy("RequirePurchaseDelete", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.PurchaseDelete)));
+    options.AddPolicy("RequirePurchaseVerify", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.PurchaseVerify)));
+    options.AddPolicy("RequirePurchaseCommit", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.PurchaseCommit)));
 });
 
 builder.Services.AddCors(options =>

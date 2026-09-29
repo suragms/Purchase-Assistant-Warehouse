@@ -168,7 +168,12 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<StockItemDto> AdjustStockAsync(Guid itemId, AdjustStockRequestDto request)
         {
-            using var tx = await _context.Database.BeginTransactionAsync();
+            var existingTx = _context.Database.CurrentTransaction;
+            Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? tx = null;
+            if (existingTx == null)
+            {
+                tx = await _context.Database.BeginTransactionAsync();
+            }
 
             var item = await GetAndValidateItemForUpdate(itemId, request.ExpectedVersion);
 
@@ -200,12 +205,22 @@ namespace PurchaseAssistant.Infrastructure.Services
             try
             {
                 await _context.SaveChangesAsync();
-                await tx.CommitAsync();
+                if (tx != null)
+                {
+                    await tx.CommitAsync();
+                }
             }
             catch (DbUpdateConcurrencyException)
             {
-                await tx.RollbackAsync();
+                if (tx != null)
+                {
+                    await tx.RollbackAsync();
+                }
                 throw new InvalidOperationException("STOCK_VERSION_CONFLICT");
+            }
+            finally
+            {
+                tx?.Dispose();
             }
 
             return await GetStockDetailAsync(item.Id);
@@ -213,7 +228,12 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<StockItemDto> UpdatePhysicalStockAsync(Guid itemId, UpdatePhysicalStockRequestDto request)
         {
-            using var tx = await _context.Database.BeginTransactionAsync();
+            var existingTx = _context.Database.CurrentTransaction;
+            Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? tx = null;
+            if (existingTx == null)
+            {
+                tx = await _context.Database.BeginTransactionAsync();
+            }
 
             var item = await GetAndValidateItemForUpdate(itemId, request.ExpectedVersion);
 
@@ -238,12 +258,22 @@ namespace PurchaseAssistant.Infrastructure.Services
             try
             {
                 await _context.SaveChangesAsync();
-                await tx.CommitAsync();
+                if (tx != null)
+                {
+                    await tx.CommitAsync();
+                }
             }
             catch (DbUpdateConcurrencyException)
             {
-                await tx.RollbackAsync();
+                if (tx != null)
+                {
+                    await tx.RollbackAsync();
+                }
                 throw new InvalidOperationException("STOCK_VERSION_CONFLICT");
+            }
+            finally
+            {
+                tx?.Dispose();
             }
 
             return await GetStockDetailAsync(item.Id);
@@ -251,7 +281,12 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<StockItemDto> ReconcileStockAsync(Guid itemId, ReconcileStockRequestDto request)
         {
-            using var tx = await _context.Database.BeginTransactionAsync();
+            var existingTx = _context.Database.CurrentTransaction;
+            Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? tx = null;
+            if (existingTx == null)
+            {
+                tx = await _context.Database.BeginTransactionAsync();
+            }
 
             var item = await GetAndValidateItemForUpdate(itemId, request.ExpectedVersion);
 
@@ -286,12 +321,22 @@ namespace PurchaseAssistant.Infrastructure.Services
             try
             {
                 await _context.SaveChangesAsync();
-                await tx.CommitAsync();
+                if (tx != null)
+                {
+                    await tx.CommitAsync();
+                }
             }
             catch (DbUpdateConcurrencyException)
             {
-                await tx.RollbackAsync();
+                if (tx != null)
+                {
+                    await tx.RollbackAsync();
+                }
                 throw new InvalidOperationException("STOCK_VERSION_CONFLICT");
+            }
+            finally
+            {
+                tx?.Dispose();
             }
 
             return await GetStockDetailAsync(item.Id);

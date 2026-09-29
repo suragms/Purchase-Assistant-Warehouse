@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   PackageOpen, LayoutDashboard, Package, Users, Truck,
   ChevronDown, ChevronRight, Menu, X, LogOut, Search,
-  Boxes, Building2
+  Boxes, Building2, ShoppingBag
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { cn } from '../lib/cn';
@@ -33,6 +33,13 @@ const navItems: NavItem[] = [
     label: 'Inventory', icon: <Boxes className="h-4 w-4" />, children: [
       { label: 'Overview', to: '/inventory/overview' },
       { label: 'Stock List', to: '/inventory/all' },
+    ]
+  },
+  {
+    label: 'Purchases', icon: <ShoppingBag className="h-4 w-4" />, children: [
+      { label: 'Overview', to: '/purchases/overview' },
+      { label: 'All Purchases', to: '/purchases/list' },
+      { label: 'New Purchase', to: '/purchases/new' },
     ]
   },
   { label: 'Users', icon: <Users className="h-4 w-4" />, to: '/users' },

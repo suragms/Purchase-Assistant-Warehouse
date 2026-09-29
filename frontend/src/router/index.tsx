@@ -21,6 +21,11 @@ const StockList = React.lazy(() => import('../pages/stock/StockList'));
 const StockDetail = React.lazy(() => import('../pages/stock/StockDetail'));
 const StockActivity = React.lazy(() => import('../pages/stock/StockActivity'));
 
+const PurchaseDashboard = React.lazy(() => import('../pages/purchases/PurchaseDashboard'));
+const PurchaseList = React.lazy(() => import('../pages/purchases/PurchaseList'));
+const PurchaseForm = React.lazy(() => import('../pages/purchases/PurchaseForm'));
+const PurchaseDetail = React.lazy(() => import('../pages/purchases/PurchaseDetail'));
+
 export const AppRouter = () => {
   return (
     <BrowserRouter>
@@ -56,6 +61,14 @@ export const AppRouter = () => {
                 <Route path="inventory/out-of-stock" element={<StockList />} />
                 <Route path="inventory/:id" element={<StockDetail />} />
                 <Route path="inventory/:id/activity" element={<StockActivity />} />
+
+                {/* Purchase Order Management — Phase 5 */}
+                <Route path="purchases" element={<Navigate to="/purchases/overview" replace />} />
+                <Route path="purchases/overview" element={<PurchaseDashboard />} />
+                <Route path="purchases/list" element={<PurchaseList />} />
+                <Route path="purchases/new" element={<PurchaseForm />} />
+                <Route path="purchases/:id" element={<PurchaseDetail />} />
+                <Route path="purchases/:id/edit" element={<PurchaseForm edit />} />
 
                 <Route path="users" element={<div className="p-4">Phase 2 Users Interface</div>} />
               </Route>

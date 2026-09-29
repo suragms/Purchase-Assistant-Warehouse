@@ -56,3 +56,10 @@ export const stockKeys = {
   detail: (id: string) => [...stockKeys.all, 'detail', id] as const,
   activity: (id: string, filters?: Record<string, unknown>) => [...stockKeys.all, 'activity', id, filters ?? {}] as const,
 };
+
+export const purchaseKeys = {
+  all: ['purchases'] as const,
+  lists: () => [...purchaseKeys.all, 'list'] as const,
+  list: (filters: Record<string, unknown>) => [...purchaseKeys.lists(), filters] as const,
+  detail: (id: string) => [...purchaseKeys.all, 'detail', id] as const,
+};

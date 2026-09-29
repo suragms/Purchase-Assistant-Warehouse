@@ -30,6 +30,8 @@ namespace PurchaseAssistant.Infrastructure.Data
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
         public DbSet<SecurityAuditLog> SecurityAuditLogs => Set<SecurityAuditLog>();
         public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+        public DbSet<PurchaseOrder> Purchases => Set<PurchaseOrder>();
+        public DbSet<PurchaseItem> PurchaseItems => Set<PurchaseItem>();
 
         public Guid CurrentBusinessId => _tenantProvider?.GetBusinessId() ?? Guid.Empty;
 
@@ -50,6 +52,8 @@ namespace PurchaseAssistant.Infrastructure.Data
             modelBuilder.Entity<Broker>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
             modelBuilder.Entity<SecurityAuditLog>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
             modelBuilder.Entity<StockMovement>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
+            modelBuilder.Entity<PurchaseOrder>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
+            modelBuilder.Entity<PurchaseItem>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
         }
     }
 }
