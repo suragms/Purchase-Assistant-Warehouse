@@ -14,9 +14,9 @@ export const categoryKeys = {
 };
 
 export const typeKeys = {
-  all: ['types'] as const,
-  lists: () => [...typeKeys.all, 'list'] as const,
-  list: (filters: Record<string, unknown>) => [...typeKeys.lists(), filters] as const,
+  all: () => ['types'] as const,
+  byCategory: (categoryId: string) => ['types', 'category', categoryId] as const,
+  detail: (id: string) => ['types', id] as const,
 };
 
 export const supplierKeys = {
@@ -36,4 +36,13 @@ export const brokerKeys = {
 export const searchKeys = {
   all: ['search'] as const,
   global: (query: string) => [...searchKeys.all, 'global', query] as const,
+};
+
+export const duplicateKeys = {
+  all: () => ['duplicates'] as const,
+  list: (minSimilarity?: number) => ['duplicates', 'list', minSimilarity ?? 70] as const,
+};
+
+export const barcodeKeys = {
+  lookup: (barcode: string) => ['barcode', barcode] as const,
 };

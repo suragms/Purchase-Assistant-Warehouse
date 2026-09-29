@@ -1,13 +1,269 @@
-import { PageHeader, Card } from '../../components/ui';
+import { useState, useRef, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { Search, Plus, Barcode, CheckCircle } from 'lucide-react';
+import { catalogApi, type CatalogItem } from '../../api/catalogApi';
+import { barcodeKeys, catalogKeys } from '../../lib/queryKeys';
+import { useAuthStore } from '../../stores/authStore';
+import { useToast } from '../../components/ui/ToastProvider';
+import { PageHeader, Card, Button, Input, Badge, Skeleton, ErrorState } from '../../components/ui';
 
 export default function BarcodeManager() {
+  const queryClient = useQueryClient();
+  const { showToast } = useToast();
+  const { user } = useAuthStore();
+
+  const hasEditPermission = user?.currentBusiness?.permissions?.includes('catalog.edit');
+
+  // -- Lookup State --
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [inputValue, setInputValue] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const { data, isLoading, error, refetch, isFetching } = useQuery({
+    queryKey: barcodeKeys.lookup(searchQuery),
+    queryFn: () => catalogApi.lookupByBarcode(searchQuery),
+    enabled: !!searchQuery,
+    retry: false, // Don't retry on 404
+  });
+
+  const isNotFound = error && (error as any).response?.status === 404;
+
+  const handleTryAgain = () => {
+    setSearchQuery('');
+    setInputValue('');
+    inputRef.current?.focus();
+  };
+
+  const handleSearchClick = () => {
+    if (inputValue.trim()) {
+      setSearchQuery(inputValue.trim());
+    }
+  };
+
+  // -- Assign State --
+  const [assignSearch, setAssignSearch] = useState('');
+  const [debouncedAssignSearch, setDebouncedAssignSearch] = useState('');
+  const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
+  const [assignBarcodeValue, setAssignBarcodeValue] = useState('');
+  const [assignError, setAssignError] = useState('');
+  const [isAssigning, setIsAssigning] = useState(false);
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedAssignSearch(assignSearch), 300);
+    return () => clearTimeout(handler);
+  }, [assignSearch]);
+
+  const { data: assignCandidates, isLoading: isLoadingCandidates } = useQuery({
+    queryKey: catalogKeys.list({ page: 1, pageSize: 10, search: debouncedAssignSearch }),
+    queryFn: () => catalogApi.getItems(1, 10, debouncedAssignSearch),
+    enabled: !!debouncedAssignSearch && !selectedItem,
+  });
+
+  const handleAssign = async () => {
+    if (!selectedItem || !assignBarcodeValue.trim()) return;
+    setAssignError('');
+    setIsAssigning(true);
+
+    try {
+      await catalogApi.updateItem(selectedItem.id, {
+        ...selectedItem,
+        barcode: assignBarcodeValue.trim(),
+      });
+      showToast('Barcode assigned successfully', 'success');
+
+      // Invalidate queries
+      queryClient.invalidateQueries({ queryKey: barcodeKeys.lookup(assignBarcodeValue.trim()) });
+      queryClient.invalidateQueries({ queryKey: catalogKeys.detail(selectedItem.id) });
+      queryClient.invalidateQueries({ queryKey: catalogKeys.lists() });
+
+      // Reset
+      setSelectedItem(null);
+      setAssignSearch('');
+      setAssignBarcodeValue('');
+    } catch (err: any) {
+      if (err.response?.status === 409) {
+        setAssignError('This barcode is already assigned to another item');
+      } else {
+        setAssignError(err.message || 'Failed to assign barcode');
+      }
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
   return (
-    <div>
-      <PageHeader title="Barcode Management" subtitle="Scan and assign barcodes to items" />
-      <Card className="p-16 flex flex-col items-center justify-center text-center">
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Barcode Scanner</h3>
-        <p className="text-gray-500 max-w-md">The standalone barcode assignment tool requires the Stock module configuration to be fully implemented in Phase 4.</p>
-      </Card>
+    <div className="flex flex-col h-full">
+      <PageHeader title="Barcode Manager" />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left Column: Lookup */}
+        <div className="flex flex-col gap-6">
+          <Card className="p-6">
+            <h2 className="text-lg font-semibold text-[#0F172A] mb-4">Lookup Barcode</h2>
+            <div className="flex gap-3 items-end">
+              <div className="flex-1">
+                <Input
+                  ref={inputRef}
+                  label="Scan or enter barcode"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSearchClick();
+                    }
+                  }}
+                  placeholder="e.g. 123456789012"
+                  autoFocus
+                />
+              </div>
+              <Button
+                onClick={handleSearchClick}
+                icon={<Search className="h-4 w-4" />}
+                disabled={!inputValue.trim()}
+              >
+                Search
+              </Button>
+            </div>
+          </Card>
+
+          {/* Results */}
+          {searchQuery && (
+            <div>
+              {isLoading || isFetching ? (
+                <Card className="p-6">
+                  <Skeleton className="h-8 w-1/3 mb-4" />
+                  <Skeleton className="h-6 w-1/2 mb-2" />
+                  <Skeleton className="h-6 w-1/2" />
+                </Card>
+              ) : isNotFound ? (
+                <Card className="p-6 border-red-200 bg-red-50 flex flex-col items-center text-center">
+                  <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center mb-3">
+                     <Barcode className="h-6 w-6 text-red-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-red-800 mb-1">Unknown barcode</h3>
+                  <p className="text-sm text-red-600 mb-5 max-w-sm">
+                    This barcode is not assigned to any item
+                  </p>
+                  <div className="flex gap-3">
+                    <Button variant="secondary" onClick={handleTryAgain}>Try Again</Button>
+                    <Link to="/catalog/items/new">
+                      <Button icon={<Plus className="h-4 w-4"/>}>Create New Item</Button>
+                    </Link>
+                  </div>
+                </Card>
+              ) : data ? (
+                <Card className="p-6 flex flex-col gap-4 border-emerald-200 bg-emerald-50/30">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-lg font-bold text-[#0F172A] flex items-center gap-2">
+                        {data.name}
+                        <CheckCircle className="h-5 w-5 text-emerald-500" />
+                      </h3>
+                      <p className="text-sm text-gray-600 font-mono mt-1">Barcode: {data.barcode}</p>
+                    </div>
+                    {data.isActive ? <Badge variant="green">Active</Badge> : <Badge variant="red">Archived</Badge>}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 text-sm mt-2">
+                    <div>
+                      <span className="text-gray-500 block mb-1">Item Code</span>
+                      <span className="font-medium text-[#0F172A]">{data.itemCode}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block mb-1">Category</span>
+                      <span className="font-medium text-[#0F172A]">{data.categoryName}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block mb-1">Type</span>
+                      <span className="font-medium text-[#0F172A]">{data.typeName || '—'}</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 mt-2 border-t border-[#E2E8E6] flex justify-end">
+                    <Link to={`/catalog/items/${data.id}`}>
+                      <Button variant="secondary">Open Item</Button>
+                    </Link>
+                  </div>
+                </Card>
+              ) : error ? (
+                <Card className="p-6">
+                  <ErrorState message="Failed to lookup barcode. Please try again." onRetry={() => refetch()} />
+                </Card>
+              ) : null}
+            </div>
+          )}
+        </div>
+
+        {/* Right Column: Assign */}
+        {hasEditPermission && (
+          <div className="flex flex-col gap-6">
+            <Card className="p-6 bg-gray-50/50">
+              <h2 className="text-lg font-semibold text-[#0F172A] mb-4">Assign Barcode to Item</h2>
+
+              <div className="flex flex-col gap-4">
+                <div className="relative">
+                  <Input
+                    label="Search Item"
+                    value={selectedItem ? selectedItem.name : assignSearch}
+                    onChange={(e) => {
+                      if (selectedItem) setSelectedItem(null);
+                      setAssignSearch(e.target.value);
+                    }}
+                    placeholder="Type to search items..."
+                  />
+                  {!selectedItem && assignSearch.trim() && (
+                    <div className="absolute top-full left-0 right-0 z-10 bg-white border border-[#E2E8E6] rounded-lg shadow-lg mt-1 max-h-60 overflow-y-auto">
+                      {isLoadingCandidates ? (
+                        <div className="p-3 text-sm text-gray-500">Loading...</div>
+                      ) : assignCandidates?.data.length === 0 ? (
+                        <div className="p-3 text-sm text-gray-500">No items found</div>
+                      ) : (
+                        <ul className="py-1">
+                          {assignCandidates?.data.map(item => (
+                            <li
+                              key={item.id}
+                              onClick={() => {
+                                setSelectedItem(item);
+                                setAssignSearch('');
+                              }}
+                              className="px-3 py-2 hover:bg-gray-50 cursor-pointer flex flex-col"
+                            >
+                              <span className="font-medium text-sm text-[#0F172A] truncate">{item.name}</span>
+                              <span className="text-xs text-gray-500">
+                                Code: {item.itemCode} | Barcode: {item.barcode || 'None'}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <Input
+                  label="New Barcode"
+                  value={assignBarcodeValue}
+                  onChange={(e) => setAssignBarcodeValue(e.target.value)}
+                  placeholder="Scan or enter new barcode"
+                  error={assignError}
+                />
+
+                <div className="pt-2 flex justify-end">
+                  <Button
+                    onClick={handleAssign}
+                    loading={isAssigning}
+                    disabled={!selectedItem || !assignBarcodeValue.trim()}
+                  >
+                    Assign
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

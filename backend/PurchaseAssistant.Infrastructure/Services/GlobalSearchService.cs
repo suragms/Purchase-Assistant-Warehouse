@@ -76,12 +76,27 @@ namespace PurchaseAssistant.Infrastructure.Services
                 })
                 .ToListAsync(cancellationToken);
 
+            var types = await _context.CategoryTypes
+                .Include(t => t.Category)
+                .Where(t => t.Name.ToLower().Contains(cleanQuery))
+                .Take(5)
+                .Select(t => new CategoryTypeDto
+                {
+                    Id = t.Id,
+                    CategoryId = t.CategoryId,
+                    CategoryName = t.Category.Name,
+                    Name = t.Name,
+                    ItemCount = 0
+                })
+                .ToListAsync(cancellationToken);
+
             return new GlobalSearchResponseDto
             {
                 Items = items,
                 Suppliers = suppliers,
                 Brokers = brokers,
-                Categories = categories
+                Categories = categories,
+                Types = types
             };
         }
     }

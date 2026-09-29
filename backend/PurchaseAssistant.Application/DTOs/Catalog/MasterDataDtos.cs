@@ -106,4 +106,23 @@ namespace PurchaseAssistant.Application.DTOs.Catalog
         public int TotalCount { get; set; }
         public int TotalPages { get; set; }
     }
+
+    public record DuplicateCandidateDto(
+        string ItemAId,
+        string ItemAName,
+        string ItemACode,
+        string? ItemABarcode,
+        string ItemACategoryId,
+        string ItemACategoryName,
+        string? ItemATypeName,
+        string ItemBId,
+        string ItemBName,
+        string ItemBCode,
+        string? ItemBBarcode,
+        string ItemBCategoryId,
+        string ItemBCategoryName,
+        string? ItemBTypeName,
+        int SimilarityScore,
+        List<string> MatchReasons
+    );
 }

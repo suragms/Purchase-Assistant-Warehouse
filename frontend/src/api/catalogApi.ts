@@ -62,6 +62,25 @@ export interface GlobalSearchResponse {
   categories: Category[];
 }
 
+export interface DuplicateCandidate {
+  itemAId: string;
+  itemAName: string;
+  itemACode: string;
+  itemABarcode?: string;
+  itemACategoryId: string;
+  itemACategoryName: string;
+  itemATypeName?: string;
+  itemBId: string;
+  itemBName: string;
+  itemBCode: string;
+  itemBBarcode?: string;
+  itemBCategoryId: string;
+  itemBCategoryName: string;
+  itemBTypeName?: string;
+  similarityScore: number;
+  matchReasons: string[];
+}
+
 export interface PaginatedResult<T> {
   data: T[];
   meta: {
@@ -87,6 +106,11 @@ export const catalogApi = {
 
   getItemById: async (id: string): Promise<CatalogItemDetail> => {
     const res = await apiClient.get(`/catalog/items/${id}`);
+    return res.data;
+  },
+
+  lookupByBarcode: async (barcode: string): Promise<CatalogItem> => {
+    const res = await apiClient.get(`/catalog/items/by-barcode/${barcode}`);
     return res.data;
   },
 
@@ -122,6 +146,30 @@ export const catalogApi = {
 
   deleteCategory: async (id: string): Promise<void> => {
     await apiClient.delete(`/catalog/categories/${id}`);
+  },
+
+  // Category Types
+  getTypesByCategory: async (categoryId: string): Promise<CategoryType[]> => {
+    const res = await apiClient.get(`/catalog/categories/${categoryId}/types`);
+    return res.data;
+  },
+
+  createType: async (categoryId: string, name: string): Promise<CategoryType> => {
+    const res = await apiClient.post(`/catalog/categories/${categoryId}/types`, JSON.stringify(name), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return res.data;
+  },
+
+  updateType: async (categoryId: string, id: string, name: string): Promise<CategoryType> => {
+    const res = await apiClient.put(`/catalog/categories/${categoryId}/types/${id}`, JSON.stringify(name), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return res.data;
+  },
+
+  deleteType: async (categoryId: string, id: string): Promise<void> => {
+    await apiClient.delete(`/catalog/categories/${categoryId}/types/${id}`);
   },
 
   // Suppliers
@@ -167,6 +215,17 @@ export const catalogApi = {
   // Search
   search: async (query: string): Promise<GlobalSearchResponse> => {
     const res = await apiClient.get(`/catalog/search?q=${encodeURIComponent(query)}`);
+    return res.data;
+  },
+
+  // Duplicate Detection
+  getDuplicateCandidates: async (minSimilarity?: number): Promise<DuplicateCandidate[]> => {
+    const params = new URLSearchParams();
+    if (minSimilarity !== undefined) {
+      params.append('minSimilarity', minSimilarity.toString());
+    }
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    const res = await apiClient.get(`/catalog/items/duplicates${queryString}`);
     return res.data;
   }
 };

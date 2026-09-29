@@ -105,6 +105,35 @@ namespace PurchaseAssistant.Infrastructure.Services
             };
         }
 
+        public async Task<CatalogItemDto?> GetByBarcodeAsync(string barcode)
+        {
+            var normalized = barcode.Trim().ToLowerInvariant();
+            var item = await _context.CatalogItems
+                .Include(i => i.Category)
+                .Include(i => i.Type)
+                .FirstOrDefaultAsync(i => i.Barcode != null && i.Barcode.ToLower() == normalized);
+
+            if (item == null) return null;
+
+            return new CatalogItemDto
+            {
+                Id = item.Id,
+                ItemCode = item.ItemCode,
+                Barcode = item.Barcode,
+                Name = item.Name,
+                CategoryId = item.CategoryId,
+                CategoryName = item.Category.Name,
+                TypeId = item.TypeId,
+                TypeName = item.Type != null ? item.Type.Name : null,
+                DefaultUnit = item.DefaultUnit,
+                KgPerUnit = item.KgPerUnit,
+                ReorderLevel = item.ReorderLevel,
+                CurrentStock = item.CurrentStock,
+                IsActive = item.IsActive,
+                RowVersion = item.RowVersion
+            };
+        }
+
         public async Task<CatalogItemDto> CreateAsync(CatalogItemDto dto, CancellationToken cancellationToken = default)
         {
             var item = new CatalogItem
@@ -175,6 +204,105 @@ namespace PurchaseAssistant.Infrastructure.Services
 
             _context.CatalogItems.Remove(item);
             await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task<List<DuplicateCandidateDto>> GetDuplicateCandidatesAsync(int? minSimilarity = 70)
+        {
+            var activeItems = await _context.CatalogItems
+                .Include(i => i.Category)
+                .Include(i => i.Type)
+                .Where(i => i.IsActive)
+                .ToListAsync();
+
+            var duplicates = new List<DuplicateCandidateDto>();
+            var threshold = minSimilarity ?? 70;
+
+            for (int i = 0; i < activeItems.Count; i++)
+            {
+                var itemA = activeItems[i];
+                for (int j = i + 1; j < activeItems.Count; j++)
+                {
+                    var itemB = activeItems[j];
+                    if (itemA.Id.CompareTo(itemB.Id) > 0)
+                    {
+                        var temp = itemA;
+                        itemA = itemB;
+                        itemB = temp;
+                    }
+
+                    var score = 0;
+                    var reasons = new List<string>();
+
+                    bool sameCategory = itemA.CategoryId == itemB.CategoryId;
+                    if (sameCategory)
+                    {
+                        score += 40;
+                        reasons.Add("SameCategory");
+                    }
+
+                    bool samePrefix = false;
+                    bool nameContains = false;
+
+                    string nameA = itemA.Name.ToLowerInvariant();
+                    string nameB = itemB.Name.ToLowerInvariant();
+
+                    if (nameA.Contains(nameB) || nameB.Contains(nameA))
+                    {
+                        nameContains = true;
+                    }
+
+                    if (nameA.Length >= 4 && nameB.Length >= 4 && nameA.Substring(0, 4) == nameB.Substring(0, 4))
+                    {
+                        samePrefix = true;
+                    }
+
+                    if (nameContains)
+                    {
+                        score += 40;
+                        if (!reasons.Contains("SimilarName")) reasons.Add("SimilarName");
+                    }
+                    else if (samePrefix)
+                    {
+                        score += 30;
+                        if (!reasons.Contains("SimilarName")) reasons.Add("SimilarName");
+                    }
+
+                    if (!string.IsNullOrEmpty(itemA.ItemCode) && !string.IsNullOrEmpty(itemB.ItemCode) &&
+                        itemA.ItemCode.Length >= 6 && itemB.ItemCode.Length >= 6 &&
+                        itemA.ItemCode.Substring(0, 6).Equals(itemB.ItemCode.Substring(0, 6), StringComparison.OrdinalIgnoreCase))
+                    {
+                        score += 30;
+                        reasons.Add("IdenticalCodePrefix");
+                    }
+
+                    if ((sameCategory && (nameContains || samePrefix)) || reasons.Contains("IdenticalCodePrefix"))
+                    {
+                        if (score >= threshold)
+                        {
+                            duplicates.Add(new DuplicateCandidateDto(
+                                itemA.Id.ToString(),
+                                itemA.Name,
+                                itemA.ItemCode,
+                                itemA.Barcode,
+                                itemA.CategoryId.ToString(),
+                                itemA.Category.Name,
+                                itemA.Type?.Name,
+                                itemB.Id.ToString(),
+                                itemB.Name,
+                                itemB.ItemCode,
+                                itemB.Barcode,
+                                itemB.CategoryId.ToString(),
+                                itemB.Category.Name,
+                                itemB.Type?.Name,
+                                score,
+                                reasons
+                            ));
+                        }
+                    }
+                }
+            }
+
+            return duplicates;
         }
     }
 }

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PurchaseAssistant.Application.DTOs.Catalog;
 using PurchaseAssistant.Application.Interfaces;
+using PurchaseAssistant.Contracts.Responses;
 
 namespace PurchaseAssistant.Web.Controllers
 {
@@ -27,6 +28,26 @@ namespace PurchaseAssistant.Web.Controllers
             CancellationToken cancellationToken = default)
         {
             return Ok(await _catalogService.GetAllAsync(page, pageSize, search, categoryId, cancellationToken));
+        }
+
+        [HttpGet("duplicates")]
+        [Authorize(Policy = "RequireCatalogView")]
+        public async Task<ActionResult<ApiResponse<List<DuplicateCandidateDto>>>> GetDuplicateCandidates([FromQuery] int? minSimilarity = 70)
+        {
+            var duplicates = await _catalogService.GetDuplicateCandidatesAsync(minSimilarity);
+            return Ok(new ApiResponse<List<DuplicateCandidateDto>>(duplicates));
+        }
+
+        [HttpGet("by-barcode/{barcode}")]
+        [Authorize(Policy = "RequireCatalogView")]
+        public async Task<ActionResult<CatalogItemDto>> GetByBarcode(string barcode)
+        {
+            var item = await _catalogService.GetByBarcodeAsync(barcode);
+            if (item == null)
+            {
+                return NotFound(new { error = "BARCODE_NOT_FOUND" });
+            }
+            return Ok(item);
         }
 
         [HttpGet("{id}")]

@@ -6,8 +6,10 @@ namespace PurchaseAssistant.Application.Interfaces
     {
         Task<PaginatedResult<CatalogItemDto>> GetAllAsync(int page = 1, int pageSize = 50, string? search = null, Guid? categoryId = null, CancellationToken cancellationToken = default);
         Task<CatalogItemDetailDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+        Task<CatalogItemDto?> GetByBarcodeAsync(string barcode);
         Task<CatalogItemDto> CreateAsync(CatalogItemDto dto, CancellationToken cancellationToken = default);
         Task<CatalogItemDto> UpdateAsync(Guid id, CatalogItemDto dto, CancellationToken cancellationToken = default);
         Task DeleteAsync(Guid id, CancellationToken cancellationToken = default);
+        Task<List<DuplicateCandidateDto>> GetDuplicateCandidatesAsync(int? minSimilarity = 70);
     }
 }
