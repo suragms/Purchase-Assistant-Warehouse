@@ -70,7 +70,7 @@ export default function TypeList() {
       showToast(`Type ${editingType ? 'updated' : 'created'}`);
       handleClose();
     },
-    onError: (err: any) => {
+    onError: (err: { normalized?: string | { message?: string } }) => {
       if (err.normalized === 'CATEGORY_TYPE_EXISTS') {
         setErrorMsg('A type with this name already exists in this category');
       } else {
@@ -87,11 +87,12 @@ export default function TypeList() {
       showToast('Type deleted');
       setDeleteOpen(false);
     },
-    onError: (err: any) => {
-      if (err.normalized === 'CATEGORY_TYPE_IN_USE') {
+    onError: (err: { normalized?: string | { message?: string } }) => {
+      const msg = typeof err.normalized === 'string' ? err.normalized : err.normalized?.message;
+      if (msg === 'CATEGORY_TYPE_IN_USE') {
         showToast('This type cannot be removed because catalog items are using it', 'error');
       } else {
-        showToast(err.normalized?.message || 'Failed to delete', 'error');
+        showToast(msg || 'Failed to delete', 'error');
       }
       setDeleteOpen(false);
     }

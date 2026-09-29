@@ -45,7 +45,7 @@ export default function DuplicateReview() {
       queryClient.invalidateQueries({ queryKey: catalogKeys.lists() });
       setItemToArchive(null);
     },
-    onError: (err: any) => {
+    onError: (err: { message?: string }) => {
       showToast(err?.message || 'Failed to archive item', 'error');
       setItemToArchive(null);
     },

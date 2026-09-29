@@ -27,7 +27,7 @@ export default function BarcodeManager() {
     retry: false, // Don't retry on 404
   });
 
-  const isNotFound = error && (error as any).response?.status === 404;
+  const isNotFound = error && (error as { response?: { status?: number } }).response?.status === 404;
 
   const handleTryAgain = () => {
     setSearchQuery('');
@@ -81,11 +81,12 @@ export default function BarcodeManager() {
       setSelectedItem(null);
       setAssignSearch('');
       setAssignBarcodeValue('');
-    } catch (err: any) {
-      if (err.response?.status === 409) {
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { status?: number }; message?: string };
+      if (errorObj.response?.status === 409) {
         setAssignError('This barcode is already assigned to another item');
       } else {
-        setAssignError(err.message || 'Failed to assign barcode');
+        setAssignError(errorObj.message || 'Failed to assign barcode');
       }
     } finally {
       setIsAssigning(false);

@@ -34,7 +34,7 @@ export default function CategoryList() {
       showToast(`Category ${editingCategory ? 'updated' : 'created'}`);
       handleClose();
     },
-    onError: (err: any) => {
+    onError: (err: { normalized?: string | { message?: string } }) => {
       if (err.normalized === 'CATEGORY_EXISTS') {
         setErrorMsg('Category name already exists.');
       } else {
@@ -51,8 +51,9 @@ export default function CategoryList() {
       showToast('Category deleted');
       setDeleteOpen(false);
     },
-    onError: (err: any) => {
-      showToast(err.normalized?.message || err.normalized === 'CATEGORY_IN_USE' ? 'Cannot delete category that contains items.' : 'Failed to delete', 'error');
+    onError: (err: { normalized?: string | { message?: string } }) => {
+      const msg = typeof err.normalized === 'string' ? err.normalized : err.normalized?.message;
+      showToast(msg === 'CATEGORY_IN_USE' ? 'Cannot delete category that contains items.' : (msg || 'Failed to delete'), 'error');
       setDeleteOpen(false);
     }
   });

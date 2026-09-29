@@ -27,9 +27,10 @@ export default function CatalogDetail() {
       showToast('Item archived successfully', 'success');
       navigate('/catalog/items');
     },
-    onError: (err: any) => {
+    onError: (err: { normalized?: string | { message?: string } }) => {
       setDeleteOpen(false);
-      showToast(err.normalized?.message || 'Could not archive item. It may be in use.', 'error');
+      const msg = typeof err.normalized === 'string' ? err.normalized : err.normalized?.message || 'Could not archive item. It may be in use.';
+      showToast(msg, 'error');
     }
   });
 

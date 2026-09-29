@@ -114,7 +114,7 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
   useEffect(() => {
     if (selectedCategoryId && types) {
       const currentTypeId = watch('typeId');
-      if (currentTypeId && !types.find((t: any) => t.id === currentTypeId)) {
+      if (currentTypeId && !types.find((t: { id: string; name: string }) => t.id === currentTypeId)) {
         setValue('typeId', '');
       }
     }
@@ -147,8 +147,8 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
       showToast(edit ? 'Item updated successfully' : 'Item created successfully', 'success');
       navigate(edit ? `/catalog/items/${id}` : `/catalog/items/${res.id}`);
     },
-    onError: (err: any) => {
-      const msg = err.normalized?.message || err.normalized;
+    onError: (err: { normalized?: string | { message?: string } }) => {
+      const msg = typeof err.normalized === 'string' ? err.normalized : err.normalized?.message;
       if (msg === 'DUPLICATE_ITEM_CODE_OR_BARCODE') {
         setError('itemCode', { type: 'manual', message: 'Item code or barcode already exists.' });
         setError('barcode', { type: 'manual', message: 'If barcode is provided, it might be a duplicate.' });
@@ -243,7 +243,7 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
               placeholder={!selectedCategoryId ? "Select a category first" : "Select Type"}
               error={errors.typeId?.message}
               {...register('typeId')}
-              options={types?.map((t: any) => ({ value: t.id, label: t.name })) || []}
+              options={types?.map((t: { id: string; name: string }) => ({ value: t.id, label: t.name })) || []}
               disabled={!selectedCategoryId || !types?.length}
             />
 
