@@ -75,3 +75,11 @@ export const notificationKeys = {
   list: (filters?: Record<string, unknown>) => [...notificationKeys.lists(), filters ?? {}] as const,
   unreadCount: () => [...notificationKeys.all, 'unread-count'] as const,
 };
+
+export const reportKeys = {
+  all: ['reports'] as const,
+  spend: (filters?: Record<string, unknown>) => [...reportKeys.all, 'spend', filters ?? {}] as const,
+  summary: (filters?: Record<string, unknown>) => [...reportKeys.all, 'summary', filters ?? {}] as const,
+  stock: () => [...reportKeys.all, 'stock'] as const,
+  comparison: (filters?: Record<string, unknown>) => [...reportKeys.all, 'comparison', filters ?? {}] as const,
+};

@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   PackageOpen, LayoutDashboard, Package, Users, Truck,
   ChevronDown, ChevronRight, Menu, X, LogOut, Search,
-  Boxes, Building2, ShoppingBag
+  Boxes, Building2, ShoppingBag, BarChart3, Bell
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { cn } from '../lib/cn';
@@ -18,6 +18,8 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" />, to: '/dashboard' },
+  { label: 'Reports', icon: <BarChart3 className="h-4 w-4" />, to: '/reports' },
+  { label: 'Notifications', icon: <Bell className="h-4 w-4" />, to: '/notifications' },
   {
     label: 'Catalog', icon: <Package className="h-4 w-4" />, children: [
       { label: 'Items', to: '/catalog/items' },
