@@ -45,6 +45,7 @@ builder.Services.AddScoped<ICatalogService, CatalogService>();
 builder.Services.AddScoped<ISupplierService, SupplierService>();
 builder.Services.AddScoped<IBrokerService, BrokerService>();
 builder.Services.AddScoped<IGlobalSearchService, GlobalSearchService>();
+builder.Services.AddScoped<IStockService, StockService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<ICurrentUserService>(sp => sp.GetRequiredService<CurrentUserService>());
@@ -93,6 +94,10 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("RequireBrokerCreate", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.BrokerCreate)));
     options.AddPolicy("RequireBrokerEdit", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.BrokerEdit)));
     options.AddPolicy("RequireBrokerDelete", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.BrokerDelete)));
+    options.AddPolicy("RequireStockView", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.StockView)));
+    options.AddPolicy("RequireStockAdjust", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.StockAdjust)));
+    options.AddPolicy("RequireStockPhysical", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.StockPhysical)));
+    options.AddPolicy("RequireStockSystem", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.StockSystem)));
 });
 
 builder.Services.AddCors(options =>

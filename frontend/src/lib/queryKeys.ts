@@ -46,3 +46,13 @@ export const duplicateKeys = {
 export const barcodeKeys = {
   lookup: (barcode: string) => ['barcode', barcode] as const,
 };
+
+export const stockKeys = {
+  all: ['stock'] as const,
+  lists: () => [...stockKeys.all, 'list'] as const,
+  list: (filters: Record<string, unknown>) => [...stockKeys.lists(), filters] as const,
+  lowStock: (filters?: Record<string, unknown>) => [...stockKeys.all, 'low-stock', filters ?? {}] as const,
+  outOfStock: (filters?: Record<string, unknown>) => [...stockKeys.all, 'out-of-stock', filters ?? {}] as const,
+  detail: (id: string) => [...stockKeys.all, 'detail', id] as const,
+  activity: (id: string, filters?: Record<string, unknown>) => [...stockKeys.all, 'activity', id, filters ?? {}] as const,
+};

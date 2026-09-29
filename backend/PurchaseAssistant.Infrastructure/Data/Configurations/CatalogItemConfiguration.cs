@@ -14,6 +14,8 @@ namespace PurchaseAssistant.Infrastructure.Data.Configurations
             builder.Property(c => c.KgPerUnit).HasPrecision(18, 4);
             builder.Property(c => c.ReorderLevel).HasPrecision(18, 4);
             builder.Property(c => c.CurrentStock).HasPrecision(18, 4);
+            builder.Property(c => c.PhysicalStock).HasPrecision(18, 4);
+            builder.Property(c => c.ReservedStock).HasPrecision(18, 4);
 
             // Concurrency token
             builder.Property(c => c.RowVersion).IsConcurrencyToken();

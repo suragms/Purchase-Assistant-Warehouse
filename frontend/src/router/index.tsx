@@ -6,7 +6,6 @@ import { ToastProvider } from '../components/ui/ToastProvider';
 import { AppShell } from '../layouts/AppShell';
 import Login from '../pages/auth/Login';
 
-// Placeholder empty components for lazy loading
 const Dashboard = React.lazy(() => import('../pages/Dashboard'));
 const CatalogList = React.lazy(() => import('../pages/catalog/CatalogList'));
 const CatalogForm = React.lazy(() => import('../pages/catalog/CatalogForm'));
@@ -17,6 +16,10 @@ const BarcodeManager = React.lazy(() => import('../pages/catalog/BarcodeManager'
 const DuplicateReview = React.lazy(() => import('../pages/catalog/DuplicateReview'));
 const SupplierList = React.lazy(() => import('../pages/suppliers/SupplierList'));
 const BrokerList = React.lazy(() => import('../pages/brokers/BrokerList'));
+const StockDashboard = React.lazy(() => import('../pages/stock/StockDashboard'));
+const StockList = React.lazy(() => import('../pages/stock/StockList'));
+const StockDetail = React.lazy(() => import('../pages/stock/StockDetail'));
+const StockActivity = React.lazy(() => import('../pages/stock/StockActivity'));
 
 export const AppRouter = () => {
   return (
@@ -45,8 +48,15 @@ export const AppRouter = () => {
                 <Route path="suppliers" element={<SupplierList />} />
                 <Route path="brokers" element={<BrokerList />} />
 
-                {/* Stubs */}
-                <Route path="inventory" element={<div className="p-4">Phase 4 Placeholder</div>} />
+                {/* Inventory / Stock — Phase 4 */}
+                <Route path="inventory" element={<Navigate to="/inventory/overview" replace />} />
+                <Route path="inventory/overview" element={<StockDashboard />} />
+                <Route path="inventory/all" element={<StockList />} />
+                <Route path="inventory/low-stock" element={<StockList />} />
+                <Route path="inventory/out-of-stock" element={<StockList />} />
+                <Route path="inventory/:id" element={<StockDetail />} />
+                <Route path="inventory/:id/activity" element={<StockActivity />} />
+
                 <Route path="users" element={<div className="p-4">Phase 2 Users Interface</div>} />
               </Route>
             </Route>

@@ -22,6 +22,12 @@ namespace PurchaseAssistant.Domain.Entities
         // System calculated current stock
         public decimal CurrentStock { get; set; } = 0;
 
+        // Physical stock recorded from warehouse counts
+        public decimal PhysicalStock { get; set; } = 0;
+
+        // Reserved stock for workflows
+        public decimal ReservedStock { get; set; } = 0;
+
         public bool IsActive { get; set; } = true;
 
         public Guid? LastSupplierId { get; set; }

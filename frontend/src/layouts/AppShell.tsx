@@ -29,7 +29,12 @@ const navItems: NavItem[] = [
   },
   { label: 'Suppliers', icon: <Truck className="h-4 w-4" />, to: '/suppliers' },
   { label: 'Brokers', icon: <Building2 className="h-4 w-4" />, to: '/brokers' },
-  { label: 'Inventory', icon: <Boxes className="h-4 w-4" />, to: '/inventory' },
+  {
+    label: 'Inventory', icon: <Boxes className="h-4 w-4" />, children: [
+      { label: 'Overview', to: '/inventory/overview' },
+      { label: 'Stock List', to: '/inventory/all' },
+    ]
+  },
   { label: 'Users', icon: <Users className="h-4 w-4" />, to: '/users' },
 ];
 

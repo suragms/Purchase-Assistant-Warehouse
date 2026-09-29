@@ -1,0 +1,183 @@
+import React, { useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { Search, AlertTriangle, PackageX } from 'lucide-react';
+import { stockApi } from '../../api/stockApi';
+import type { StockItem } from '../../api/stockApi';
+import { stockKeys } from '../../lib/queryKeys';
+
+type StockFilter = 'all' | 'low-stock' | 'out-of-stock';
+
+export default function StockList() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [search, setSearch] = useState('');
+  const filter: StockFilter = (searchParams.get('filter') as StockFilter) ?? 'all';
+  const page = parseInt(searchParams.get('page') ?? '1', 10);
+
+  const queryFn =
+    filter === 'low-stock'
+      ? () => stockApi.getLowStock(page, 50, search || undefined)
+      : filter === 'out-of-stock'
+      ? () => stockApi.getOutOfStock(page, 50, search || undefined)
+      : () => stockApi.getItems(page, 50, search || undefined);
+
+  const queryKey =
+    filter === 'low-stock'
+      ? stockKeys.lowStock({ page, search })
+      : filter === 'out-of-stock'
+      ? stockKeys.outOfStock({ page, search })
+      : stockKeys.list({ page, search });
+
+  const { data, isLoading } = useQuery({ queryKey, queryFn });
+
+  const setFilter = (f: StockFilter) => {
+    setSearchParams({ filter: f, page: '1' });
+  };
+
+  const tabs: { key: StockFilter; label: string; icon?: React.ReactNode }[] = [
+    { key: 'all', label: 'All Items' },
+    { key: 'low-stock', label: 'Low Stock', icon: <AlertTriangle className="h-3 w-3" /> },
+    { key: 'out-of-stock', label: 'Out of Stock', icon: <PackageX className="h-3 w-3" /> },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h1 className="text-2xl font-bold text-[#0E4F46]">Inventory</h1>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit">
+        {tabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setFilter(tab.key)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              filter === tab.key
+                ? 'bg-white text-[#0E4F46] shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search items…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0E4F46]/20 focus:border-[#0E4F46]"
+        />
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {isLoading ? (
+          <div className="flex justify-center py-16">
+            <span className="animate-spin h-6 w-6 border-2 border-[#0E4F46] border-t-transparent rounded-full" />
+          </div>
+        ) : (
+          <table className="min-w-full divide-y divide-gray-100">
+            <thead className="bg-gray-50">
+              <tr>
+                {['Item', 'System Stock', 'Physical', 'Reserved', 'Available', 'Reorder Level', ''].map(h => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {(data?.data ?? []).map(item => (
+                <StockRow key={item.id} item={item} />
+              ))}
+              {data?.data.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-gray-400">
+                    No items found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Pagination */}
+      {data && data.meta.totalPages > 1 && (
+        <div className="flex items-center justify-between text-sm text-gray-500">
+          <span>
+            {(page - 1) * 50 + 1}–{Math.min(page * 50, data.meta.totalCount)} of {data.meta.totalCount}
+          </span>
+          <div className="flex gap-2">
+            <button
+              disabled={page <= 1}
+              onClick={() => setSearchParams({ filter, page: String(page - 1) })}
+              className="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50"
+            >
+              Previous
+            </button>
+            <button
+              disabled={page >= data.meta.totalPages}
+              onClick={() => setSearchParams({ filter, page: String(page + 1) })}
+              className="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StockRow({ item }: { item: StockItem }) {
+  const isOutOfStock = item.availableStock <= 0;
+  const isLow = !isOutOfStock && item.availableStock <= item.reorderLevel;
+
+  return (
+    <tr className="hover:bg-gray-50 transition-colors">
+      <td className="px-4 py-3">
+        <p className="text-sm font-medium text-gray-900">{item.name}</p>
+        <p className="text-xs text-gray-400">{item.itemCode}{item.barcode ? ` · ${item.barcode}` : ''}</p>
+      </td>
+      <td className="px-4 py-3 text-sm text-gray-600">
+        {item.systemStock} {item.defaultUnit}
+      </td>
+      <td className="px-4 py-3 text-sm text-gray-600">
+        {item.physicalStock} {item.defaultUnit}
+      </td>
+      <td className="px-4 py-3 text-sm text-gray-600">
+        {item.reservedStock} {item.defaultUnit}
+      </td>
+      <td className="px-4 py-3">
+        <span className={`text-sm font-semibold ${isOutOfStock ? 'text-red-600' : isLow ? 'text-amber-600' : 'text-[#0E4F46]'}`}>
+          {item.availableStock} {item.defaultUnit}
+        </span>
+        {isOutOfStock && (
+          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">Out</span>
+        )}
+        {isLow && (
+          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">Low</span>
+        )}
+      </td>
+      <td className="px-4 py-3 text-sm text-gray-600">
+        {item.reorderLevel} {item.defaultUnit}
+      </td>
+      <td className="px-4 py-3">
+        <Link
+          to={`/inventory/${item.id}`}
+          className="text-sm text-[#0E4F46] hover:underline font-medium"
+        >
+          View
+        </Link>
+      </td>
+    </tr>
+  );
+}

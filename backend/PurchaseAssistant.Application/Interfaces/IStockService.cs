@@ -1,0 +1,18 @@
+using PurchaseAssistant.Application.DTOs.Catalog;
+using PurchaseAssistant.Application.DTOs.Stock;
+using System;
+using System.Threading.Tasks;
+
+namespace PurchaseAssistant.Application.Interfaces
+{
+    public interface IStockService
+    {
+        Task<PaginatedResult<StockItemDto>> GetStockItemsAsync(int page, int pageSize, string? search, bool? lowStockOnly, bool? outOfStockOnly);
+        Task<StockItemDto> GetStockDetailAsync(Guid itemId);
+        Task<PaginatedResult<StockMovementDto>> GetItemActivityAsync(Guid itemId, int page, int pageSize);
+
+        Task<StockItemDto> AdjustStockAsync(Guid itemId, AdjustStockRequestDto request);
+        Task<StockItemDto> UpdatePhysicalStockAsync(Guid itemId, UpdatePhysicalStockRequestDto request);
+        Task<StockItemDto> ReconcileStockAsync(Guid itemId, ReconcileStockRequestDto request);
+    }
+}
