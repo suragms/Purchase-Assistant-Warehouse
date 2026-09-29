@@ -76,6 +76,12 @@ export const notificationKeys = {
   unreadCount: () => [...notificationKeys.all, 'unread-count'] as const,
 };
 
+export const userKeys = {
+  all: ['users'] as const,
+  lists: () => [...userKeys.all, 'list'] as const,
+  detail: (id: string) => [...userKeys.all, 'detail', id] as const,
+};
+
 export const reportKeys = {
   all: ['reports'] as const,
   spend: (filters?: Record<string, unknown>) => [...reportKeys.all, 'spend', filters ?? {}] as const,

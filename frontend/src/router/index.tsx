@@ -27,6 +27,7 @@ const PurchaseForm = React.lazy(() => import('../pages/purchases/PurchaseForm'))
 const PurchaseDetail = React.lazy(() => import('../pages/purchases/PurchaseDetail'));
 const ReportsDashboard = React.lazy(() => import('../pages/reports/ReportsDashboard'));
 const NotificationsPage = React.lazy(() => import('../pages/NotificationsPage'));
+const UsersPage = React.lazy(() => import('../pages/users/UsersPage'));
 
 export const AppRouter = () => {
   return (
@@ -78,7 +79,7 @@ export const AppRouter = () => {
                 {/* Notifications — Phase 6 */}
                 <Route path="notifications" element={<NotificationsPage />} />
 
-                <Route path="users" element={<div className="p-4">Phase 2 Users Interface</div>} />
+                <Route path="users" element={<UsersPage />} />
               </Route>
             </Route>
 

@@ -1,8 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PurchaseAssistant.Application.DTOs.Users;
 using PurchaseAssistant.Application.Interfaces;
 using PurchaseAssistant.Contracts.Responses;
-using PurchaseAssistant.Domain.Constants;
+using System;
 using System.Threading.Tasks;
 
 namespace PurchaseAssistant.Web.Controllers
@@ -12,11 +13,12 @@ namespace PurchaseAssistant.Web.Controllers
     [Authorize]
     public class UsersController : ControllerBase
     {
+        private readonly IUserService _userService;
         private readonly ICurrentUserService _currentUser;
-        // In a full implementation, we'd inject AppDbContext or a UserService here.
 
-        public UsersController(ICurrentUserService currentUser)
+        public UsersController(IUserService userService, ICurrentUserService currentUser)
         {
+            _userService = userService;
             _currentUser = currentUser;
         }
 
@@ -24,23 +26,78 @@ namespace PurchaseAssistant.Web.Controllers
         [Authorize(Policy = "RequireUsersView")]
         public async Task<IActionResult> GetUsers()
         {
-            // Placeholder: Fetch all memberships for _currentUser.BusinessId, map to DTOs
-            return Ok(new ApiResponse<object>(new { }));
+            var users = await _userService.GetAllUsersAsync();
+            return Ok(new ApiResponse<object>(users));
+        }
+
+        [HttpGet("{id}")]
+        [Authorize(Policy = "RequireUsersView")]
+        public async Task<IActionResult> GetUserById(Guid id)
+        {
+            var user = await _userService.GetUserByIdAsync(id);
+            if (user == null)
+            {
+                return NotFound(new ApiResponse<object>(null, "User not found."));
+            }
+            return Ok(new ApiResponse<object>(user));
         }
 
         [HttpPost]
         [Authorize(Policy = "RequireUsersManage")]
-        public async Task<IActionResult> CreateUser([FromBody] object request)
+        public async Task<IActionResult> CreateUser([FromBody] CreateUserDto request)
         {
-            // Placeholder: Create user, membership, hash password, assign role
-            return Ok(new ApiResponse<object>(new { }));
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var created = await _userService.CreateUserAsync(request);
+            return CreatedAtAction(nameof(GetUserById), new { id = created.Id }, new ApiResponse<object>(created));
+        }
+
+        [HttpPut("{id}")]
+        [Authorize(Policy = "RequireUsersManage")]
+        public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateUserDto request)
+        {
+            var success = await _userService.UpdateUserAsync(id, request);
+            if (!success)
+            {
+                return NotFound(new ApiResponse<object>(null, "User not found."));
+            }
+            return Ok(new ApiResponse<bool>(true));
         }
 
         [HttpPost("{id}/block")]
         [Authorize(Policy = "RequireUsersManage")]
-        public async Task<IActionResult> BlockUser(System.Guid id)
+        public async Task<IActionResult> BlockUser(Guid id)
         {
-            // Placeholder: Update UserStatus to Blocked
+            var user = await _userService.GetUserByIdAsync(id);
+            if (user == null)
+            {
+                return NotFound(new ApiResponse<object>(null, "User not found."));
+            }
+
+            var updateDto = new UpdateUserDto
+            {
+                Name = user.Name,
+                Email = user.Email,
+                Role = user.Role,
+                Status = Domain.Enums.UserStatus.Blocked
+            };
+
+            await _userService.UpdateUserAsync(id, updateDto);
+            return Ok(new ApiResponse<bool>(true));
+        }
+
+        [HttpDelete("{id}")]
+        [Authorize(Policy = "RequireUsersManage")]
+        public async Task<IActionResult> DeleteUser(Guid id)
+        {
+            var success = await _userService.DeleteUserAsync(id);
+            if (!success)
+            {
+                return NotFound(new ApiResponse<object>(null, "User not found."));
+            }
             return Ok(new ApiResponse<bool>(true));
         }
     }
