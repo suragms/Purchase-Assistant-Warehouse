@@ -48,3 +48,7 @@ Desktop.ini
 .claude/
 *.swp
 *~
+
+# Local references & tokens
+reference-repo/
+token.txt

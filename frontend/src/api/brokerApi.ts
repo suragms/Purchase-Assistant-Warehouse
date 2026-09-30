@@ -17,7 +17,7 @@ export const brokerApi = {
     params.append('pageSize', pageSize.toString());
     if (search) params.append('search', search);
 
-    const res = await apiClient.get(`/brokers?${params.toString()}`);
+    const res = await apiClient.get(`/catalog/brokers?${params.toString()}`);
     return res.data;
   },
 };

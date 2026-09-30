@@ -182,31 +182,28 @@ if (app.Environment.IsDevelopment())
                 CreatedAt = DateTime.UtcNow
             };
             db.Businesses.Add(business);
+            Console.WriteLine("Seeded initial business.");
+        }
 
-            var adminUser = new User
+        // Update permissions for admin
+        var adminUser = await db.Users.FirstOrDefaultAsync(u => u.Email == "admin@warehouse.local");
+        if (adminUser != null)
+        {
+            var membership = await db.Memberships.FirstOrDefaultAsync(m => m.UserId == adminUser.Id);
+            if (membership != null)
             {
-                Id = Guid.NewGuid(),
-                Name = "Admin User",
-                Email = "admin@warehouse.local",
-                PasswordHash = hasher.HashPassword("Password123!"),
-                Status = UserStatus.Active,
-                CreatedAt = DateTime.UtcNow
-            };
-            db.Users.Add(adminUser);
-
-            var membership = new Membership
-            {
-                Id = Guid.NewGuid(),
-                BusinessId = business.Id,
-                UserId = adminUser.Id,
-                Role = Role.Admin,
-                PermissionsJson = JsonSerializer.Serialize(new[] { "users.view", "users.manage", "catalog.view", "catalog.manage", "stock.view", "stock.manage", "purchases.view", "purchases.manage" }),
-                CreatedAt = DateTime.UtcNow
-            };
-            db.Memberships.Add(membership);
-
-            await db.SaveChangesAsync();
-            Console.WriteLine("Seeded initial business and admin (admin@warehouse.local / Password123!)");
+                membership.PermissionsJson = JsonSerializer.Serialize(new[] {
+                    "users.view", "users.manage",
+                    "catalog.view", "catalog.manage",
+                    "stock.view", "stock.manage",
+                    "purchases.view", "purchases.manage",
+                    "supplier.view", "supplier.create", "supplier.edit", "supplier.delete",
+                    "broker.view", "broker.create", "broker.edit", "broker.delete",
+                    "reports.view", "settings.manage"
+                });
+                await db.SaveChangesAsync();
+                Console.WriteLine("Verified/Updated permissions for admin user.");
+            }
         }
     }
     catch (Exception ex)

@@ -18,7 +18,7 @@ export const supplierApi = {
     params.append('pageSize', pageSize.toString());
     if (search) params.append('search', search);
 
-    const res = await apiClient.get(`/suppliers?${params.toString()}`);
+    const res = await apiClient.get(`/catalog/suppliers?${params.toString()}`);
     return res.data;
   },
 };
