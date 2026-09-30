@@ -10,7 +10,7 @@
 | Provider factory | IMPLEMENTED | VERIFIED_TEST |
 | Provider routing | IMPLEMENTED | VERIFIED_TEST |
 | Failover | IMPLEMENTED | VERIFIED_TEST |
-| AI disabled mode | IMPLEMENTED | VERIFIED_TEST |
+| AI Purchase Intent Parsing | IMPLEMENTED | VERIFIED_TEST |
 | Credential security | IMPLEMENTED | VERIFIED_CODE |
 | Tenant isolation | IMPLEMENTED | VERIFIED_CODE |
 | Reports authorization | IMPLEMENTED | VERIFIED_CODE |

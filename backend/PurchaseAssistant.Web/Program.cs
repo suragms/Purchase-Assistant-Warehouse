@@ -19,6 +19,7 @@ using PurchaseAssistant.Application.DTOs.AI;
 using PurchaseAssistant.Application.Interfaces.AI;
 using PurchaseAssistant.Infrastructure.Services.AI;
 using Microsoft.EntityFrameworkCore;
+using PurchaseAssistant.Application.Interfaces;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using System.Text.Json;
@@ -61,7 +62,8 @@ builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<ICurrentUserService>(sp => sp.GetRequiredService<CurrentUserService>());
 builder.Services.AddScoped<ITenantProvider>(sp => sp.GetRequiredService<CurrentUserService>());
 
-// AI Providers
+builder.Services.AddScoped<IPurchaseParsingService, PurchaseParsingService>();
+
 builder.Services.AddHttpClient<OpenAIProvider>();
 builder.Services.AddHttpClient<GeminiProvider>();
 builder.Services.AddHttpClient<GroqProvider>();

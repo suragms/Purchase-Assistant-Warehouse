@@ -7,6 +7,8 @@ import { brokerApi } from '../../api/brokerApi';
 import { catalogApi } from '../../api/catalogApi';
 import { purchaseKeys } from '../../lib/queryKeys';
 import { ShoppingBag, Plus, Trash2, ArrowLeft, Save } from 'lucide-react';
+import { PurchaseAssistant } from '../../components/AI/PurchaseAssistant';
+import type { PurchaseIntentItemCandidateDto } from '../../api/purchaseIntentApi';
 
 interface PurchaseFormProps {
   edit?: boolean;
@@ -60,6 +62,16 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
       })));
     }
   }, [edit, existingOrder]);
+
+  const handleDraftConfirmed = (candidateItems: PurchaseIntentItemCandidateDto[], inferredSupplierId?: string) => {
+    setItems(candidateItems.map(i => ({
+      catalogItemId: i.catalogItemId || '',
+      orderedQuantity: i.requestedQuantity,
+      unitPrice: 0,
+      notes: ''
+    })));
+    if (inferredSupplierId) setSupplierId(inferredSupplierId);
+  };
 
   const createMutation = useMutation({
     mutationFn: (dto: UpsertPurchaseOrderDto) => purchaseApi.createPurchase(dto),
@@ -145,6 +157,8 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
           </p>
         </div>
       </div>
+
+      <PurchaseAssistant onDraftConfirmed={handleDraftConfirmed} />
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Main Details Card */}
