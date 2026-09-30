@@ -103,6 +103,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("RequireStockAdjust", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.StockAdjust)));
     options.AddPolicy("RequireStockPhysical", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.StockPhysical)));
     options.AddPolicy("RequireStockSystem", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.StockSystem)));
+    options.AddPolicy("RequireReportsView", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.ReportsView)));
     options.AddPolicy("RequirePurchaseView", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.PurchaseView)));
     options.AddPolicy("RequirePurchaseCreate", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.PurchaseCreate)));
     options.AddPolicy("RequirePurchaseEdit", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.PurchaseEdit)));

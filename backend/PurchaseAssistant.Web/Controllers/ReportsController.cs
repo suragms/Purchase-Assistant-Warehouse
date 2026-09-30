@@ -28,7 +28,7 @@ namespace PurchaseAssistant.Web.Controllers
         }
 
         [HttpGet("spend")]
-        [Authorize(Policy = "RequirePurchaseView")]
+        [Authorize(Policy = "RequireReportsView")]
         public async Task<ActionResult<List<SpendAnalyticsDto>>> GetSpendAnalytics(
             [FromQuery] DateTime? startDate = null,
             [FromQuery] DateTime? endDate = null,
@@ -42,7 +42,7 @@ namespace PurchaseAssistant.Web.Controllers
         }
 
         [HttpGet("purchases-summary")]
-        [Authorize(Policy = "RequirePurchaseView")]
+        [Authorize(Policy = "RequireReportsView")]
         public async Task<ActionResult<PurchaseSummaryReportDto>> GetPurchaseSummary(
             [FromQuery] DateTime? startDate = null,
             [FromQuery] DateTime? endDate = null)
@@ -55,7 +55,7 @@ namespace PurchaseAssistant.Web.Controllers
         }
 
         [HttpGet("stock-analytics")]
-        [Authorize(Policy = "RequireStockView")]
+        [Authorize(Policy = "RequireReportsView")]
         public async Task<ActionResult<StockAnalyticsDto>> GetStockAnalytics()
         {
             var businessId = GetBusinessId();
@@ -64,7 +64,7 @@ namespace PurchaseAssistant.Web.Controllers
         }
 
         [HttpGet("comparison")]
-        [Authorize(Policy = "RequirePurchaseView")]
+        [Authorize(Policy = "RequireReportsView")]
         public async Task<ActionResult<PeriodComparisonDto>> GetPeriodComparison(
             [FromQuery] DateTime? startDate = null,
             [FromQuery] DateTime? endDate = null)
