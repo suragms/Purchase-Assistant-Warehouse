@@ -15,6 +15,9 @@ using System.Reflection;
 using PurchaseAssistant.Domain.Constants;
 using PurchaseAssistant.Domain.Entities;
 using PurchaseAssistant.Domain.Enums;
+using PurchaseAssistant.Application.DTOs.AI;
+using PurchaseAssistant.Application.Interfaces.AI;
+using PurchaseAssistant.Infrastructure.Services.AI;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
@@ -36,6 +39,8 @@ builder.Services.Configure<JwtOptions>(options =>
     options.ExpirationMinutes = 15;
 });
 
+builder.Services.Configure<AiOptions>(builder.Configuration.GetSection("AI"));
+
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IJwtProvider, JwtProvider>();
 builder.Services.AddScoped<IEntityNormalizationService, EntityNormalizationService>();
@@ -55,6 +60,19 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<ICurrentUserService>(sp => sp.GetRequiredService<CurrentUserService>());
 builder.Services.AddScoped<ITenantProvider>(sp => sp.GetRequiredService<CurrentUserService>());
+
+// AI Providers
+builder.Services.AddHttpClient<OpenAIProvider>();
+builder.Services.AddHttpClient<GeminiProvider>();
+builder.Services.AddHttpClient<GroqProvider>();
+builder.Services.AddHttpClient<OpenRouterProvider>();
+builder.Services.AddScoped<IAIProvider>(sp => new OpenAIProvider(sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(OpenAIProvider)), builder.Configuration["AI:Providers:OpenAI:ApiKey"] ?? ""));
+builder.Services.AddScoped<IAIProvider>(sp => new GeminiProvider(sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(GeminiProvider)), builder.Configuration["AI:Providers:Gemini:ApiKey"] ?? ""));
+builder.Services.AddScoped<IAIProvider>(sp => new GroqProvider(sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(GroqProvider)), builder.Configuration["AI:Providers:Groq:ApiKey"] ?? ""));
+builder.Services.AddScoped<IAIProvider>(sp => new OpenRouterProvider(sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(OpenRouterProvider)), builder.Configuration["AI:Providers:OpenRouter:ApiKey"] ?? ""));
+builder.Services.AddScoped<IAIProvider, StubAIProvider>();
+builder.Services.AddScoped<IAIProviderFactory, AIProviderFactory>();
+builder.Services.AddScoped<IAIRoutingService, AIRoutingService>();
 
 // Database
 builder.Services.AddDbContext<AppDbContext>(options =>

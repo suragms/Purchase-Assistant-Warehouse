@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using PurchaseAssistant.Application.DTOs.AI;
 using PurchaseAssistant.Application.Interfaces.AI;
 
@@ -6,8 +7,9 @@ namespace PurchaseAssistant.Infrastructure.Services.AI;
 
 public class AIRoutingService : IAIRoutingService
 {
-    private readonly IEnumerable<IAIProvider> _providers;
+    private readonly IAIProviderFactory _providerFactory;
     private readonly ILogger<AIRoutingService> _logger;
+    private readonly AiOptions _aiOptions;
 
     // Define priority order
     private readonly AIProviderType[] _failoverOrder =
@@ -19,21 +21,26 @@ public class AIRoutingService : IAIRoutingService
         AIProviderType.Stub
     };
 
-    public AIRoutingService(IEnumerable<IAIProvider> providers, ILogger<AIRoutingService> logger)
+    public AIRoutingService(IAIProviderFactory providerFactory, ILogger<AIRoutingService> logger, IOptions<AiOptions> aiOptions)
     {
-        _providers = providers;
+        _providerFactory = providerFactory;
         _logger = logger;
+        _aiOptions = aiOptions.Value;
     }
 
     public async Task<AIResponse> ExecuteWithFailoverAsync(AIRequest request, CancellationToken ct = default)
     {
+        if (!_aiOptions.Enabled)
+        {
+            return new AIResponse(false, null, "AI_DISABLED", "None", "None", 0);
+        }
+
         foreach (var providerType in _failoverOrder)
         {
-            var provider = _providers.FirstOrDefault(p => p.ProviderType == providerType);
-            if (provider == null) continue;
-
             try
             {
+                var provider = _providerFactory.GetProvider(providerType);
+
                 var response = await provider.SendRequestAsync(request, ct);
                 if (response.Success)
                 {
@@ -42,6 +49,10 @@ public class AIRoutingService : IAIRoutingService
                 }
 
                 _logger.LogWarning("AI Request failed using {Provider}: {Error}", providerType, response.Error);
+            }
+            catch (NotSupportedException)
+            {
+                _logger.LogInformation("Provider {Provider} not configured, skipping.", providerType);
             }
             catch (Exception ex)
             {
