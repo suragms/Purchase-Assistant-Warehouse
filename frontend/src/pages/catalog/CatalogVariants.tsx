@@ -55,7 +55,7 @@ export default function CatalogVariants({ itemId, variants = [] }: { itemId: str
       busy.current = true; setError(''); save.mutate({ name: name.trim(), kgPerUnit });
     }}>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Input label="Variant name" value={name} maxLength={150} required disabled={save.isPending} onChange={e => setName(e.target.value)} />
+        <Input label="Variant name" value={name} maxLength={512} required disabled={save.isPending} onChange={e => setName(e.target.value)} />
         <Input label="Variant kg per unit" type="number" min="0.0001" max={MAX_PURCHASE_VALUE} step="0.0001" value={weight} disabled={save.isPending} onChange={e => setWeight(e.target.value)} hint="Optional default weight" />
       </div>
       <div className="flex flex-wrap gap-2">

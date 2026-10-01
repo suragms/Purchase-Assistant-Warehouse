@@ -9,7 +9,7 @@ namespace PurchaseAssistant.Infrastructure.Data.Configurations
         public void Configure(EntityTypeBuilder<CatalogVariant> builder)
         {
             builder.HasKey(x => x.Id);
-            builder.Property(x => x.Name).IsRequired().HasMaxLength(150);
+            builder.Property(x => x.Name).IsRequired().HasMaxLength(512);
             builder.Property(x => x.KgPerUnit).HasPrecision(18, 4);
             builder.Property(x => x.RowVersion).IsConcurrencyToken().HasDefaultValueSql("gen_random_uuid()");
             builder.Property<string>("NormalizedName").HasComputedColumnSql("lower(btrim(\"Name\"))", stored: true);

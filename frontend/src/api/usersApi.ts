@@ -4,8 +4,8 @@ export interface UserDto {
   id: string;
   name: string;
   email: string;
-  status: number; // 0: Active, 1: Blocked, etc.
-  role: number; // 0: Admin, 1: Manager, 2: Staff, etc.
+  status: number; // UserStatus values from the backend.
+  role: number; // Role values from the backend.
   createdAt: string;
 }
 
@@ -51,3 +51,7 @@ export const usersApi = {
     await apiClient.delete(`/users/${id}`);
   },
 };
+
+// Keep numeric API values explicit; do not infer roles from option order.
+export const USER_ROLES = [{ value: 0, label: 'SuperAdmin' }, { value: 1, label: 'Owner' }, { value: 2, label: 'Admin' }, { value: 3, label: 'Manager' }, { value: 4, label: 'Staff' }];
+export const USER_STATUSES = [{ value: 0, label: 'Active' }, { value: 1, label: 'Inactive' }, { value: 2, label: 'Blocked' }, { value: 3, label: 'Deleted' }, { value: 4, label: 'Pending verification' }];

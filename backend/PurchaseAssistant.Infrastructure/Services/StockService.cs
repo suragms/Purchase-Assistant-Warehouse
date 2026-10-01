@@ -173,6 +173,7 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<StockItemDto> AdjustStockAsync(Guid itemId, AdjustStockRequestDto request)
         {
+            if (string.IsNullOrWhiteSpace(request.Reason) || request.Reason.Length > 500 || request.Notes?.Length > 2000) throw new ArgumentException("A stock adjustment reason is required.");
             if (request.QuantityDelta == 0 || request.QuantityDelta > PurchaseInputLimits.MaxValue || request.QuantityDelta < -PurchaseInputLimits.MaxValue || decimal.Round(request.QuantityDelta, 4) != request.QuantityDelta)
                 throw new ArgumentException("Enter a nonzero stock adjustment within range, with at most four decimal places.");
             await using var tx = _context.Database.CurrentTransaction == null

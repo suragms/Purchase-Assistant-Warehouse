@@ -29,6 +29,12 @@ export const DeliveryState = {
 export type DeliveryState = typeof DeliveryState[keyof typeof DeliveryState];
 
 export interface PurchaseItemDto {
+  unit?: string;
+  freightType?: string;
+  freightAmount?: number;
+  deliveredCharge?: number;
+  billtyCharge?: number;
+
   id: string;
   purchaseOrderId: string;
   catalogItemId: string;
@@ -46,6 +52,15 @@ export interface PurchaseItemDto {
 }
 
 export interface PurchaseOrderDto {
+  headerDiscountPercent?: number;
+  freightType?: string;
+  freightAmount?: number;
+  deliveredCharge?: number;
+  billtyCharge?: number;
+  commissionMode?: string;
+  commissionPercent?: number;
+  commissionAmount?: number;
+
   version: number;
   id: string;
   orderNumber: string;
@@ -76,6 +91,12 @@ export interface PurchaseOrderDto {
 }
 
 export interface UpsertPurchaseItemDto {
+  unit?: string;
+  freightType?: string;
+  freightAmount?: number;
+  deliveredCharge?: number;
+  billtyCharge?: number;
+
   catalogItemId: string;
   orderedQuantity: number;
   unitPrice: number;
@@ -103,6 +124,15 @@ export interface PurchaseActivityDto {
 }
 
 export interface UpsertPurchaseOrderDto {
+  headerDiscountPercent?: number;
+  freightType?: string;
+  freightAmount?: number;
+  deliveredCharge?: number;
+  billtyCharge?: number;
+  commissionMode?: string;
+  commissionPercent?: number;
+  commissionAmount?: number;
+
   paymentDays?: number;
   previewToken?: string;
   expectedVersion?: number;

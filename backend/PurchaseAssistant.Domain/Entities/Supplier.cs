@@ -13,6 +13,7 @@ namespace PurchaseAssistant.Domain.Entities
 
     public class Broker : TenantEntity
     {
+        public string? ImageUrl { get; set; }
         public string Name { get; set; } = string.Empty;
         public bool IsActive { get; set; } = true;
     }

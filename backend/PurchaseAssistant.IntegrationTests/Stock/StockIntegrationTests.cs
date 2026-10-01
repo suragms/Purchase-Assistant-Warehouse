@@ -192,11 +192,11 @@ namespace PurchaseAssistant.IntegrationTests.Stock
             var sutB = new StockService(ctxB, _user);
 
             // Act — User A adjusts successfully
-            var reqA = new AdjustStockRequestDto { QuantityDelta = 10, ExpectedVersion = originalVersion };
+            var reqA = new AdjustStockRequestDto { Reason = "Regression stock adjustment", QuantityDelta = 10, ExpectedVersion = originalVersion };
             var resultA = await sutA.AdjustStockAsync(item.Id, reqA);
 
             // User B uses the stale original version — must fail
-            var reqB = new AdjustStockRequestDto { QuantityDelta = -10, ExpectedVersion = originalVersion };
+            var reqB = new AdjustStockRequestDto { Reason = "Regression stock adjustment", QuantityDelta = -10, ExpectedVersion = originalVersion };
             var actB = async () => await sutB.AdjustStockAsync(item.Id, reqB);
 
             // Assert
@@ -261,7 +261,7 @@ namespace PurchaseAssistant.IntegrationTests.Stock
 
                 // Adjust: AdjustStock targeting B's item — must throw KeyNotFoundException
                 var adjustAct = async () => await sutA.AdjustStockAsync(businessBItemId,
-                    new AdjustStockRequestDto { QuantityDelta = -50, ExpectedVersion = businessBItemVersion });
+                    new AdjustStockRequestDto { Reason = "Regression stock adjustment", QuantityDelta = -50, ExpectedVersion = businessBItemVersion });
                 await adjustAct.Should().ThrowAsync<KeyNotFoundException>(
                     "Business A must not be able to adjust Business B's stock");
 

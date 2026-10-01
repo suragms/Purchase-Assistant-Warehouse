@@ -27,6 +27,7 @@ namespace PurchaseAssistant.Infrastructure.Services
                 {
                     Id = brk.Id,
                     Name = brk.Name,
+                    ImageUrl = brk.ImageUrl,
                     IsActive = brk.IsActive,
                     LinkedSuppliersCount = _context.BrokerSuppliers.Count(bs => bs.BrokerId == brk.Id)
                 }).ToListAsync(cancellationToken);
@@ -42,6 +43,7 @@ namespace PurchaseAssistant.Infrastructure.Services
             {
                 Id = brk.Id,
                 Name = brk.Name,
+                    ImageUrl = brk.ImageUrl,
                 IsActive = brk.IsActive,
                 LinkedSuppliersCount = count
             };
@@ -65,6 +67,7 @@ namespace PurchaseAssistant.Infrastructure.Services
             {
                 BusinessId = businessId,
                 Name = dto.Name.Trim(),
+                ImageUrl = PurchaseAssistant.Application.DTOs.SafeImageUrl.Validate(dto.ImageUrl),
                 IsActive = dto.IsActive
             };
 
@@ -75,6 +78,7 @@ namespace PurchaseAssistant.Infrastructure.Services
             {
                 Id = broker.Id,
                 Name = broker.Name,
+                ImageUrl = broker.ImageUrl,
                 IsActive = broker.IsActive,
                 LinkedSuppliersCount = 0
             };
@@ -86,6 +90,7 @@ namespace PurchaseAssistant.Infrastructure.Services
             if (broker == null) throw new KeyNotFoundException("BROKER_NOT_FOUND");
 
             broker.Name = dto.Name.Trim();
+            broker.ImageUrl = PurchaseAssistant.Application.DTOs.SafeImageUrl.Validate(dto.ImageUrl);
             broker.IsActive = dto.IsActive;
             broker.UpdatedAt = DateTime.UtcNow;
 
@@ -96,6 +101,7 @@ namespace PurchaseAssistant.Infrastructure.Services
             {
                 Id = broker.Id,
                 Name = broker.Name,
+                ImageUrl = broker.ImageUrl,
                 IsActive = broker.IsActive,
                 LinkedSuppliersCount = count
             };

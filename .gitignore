@@ -56,3 +56,6 @@ token.txt
 # Browser regression output
 frontend/test-results/
 frontend/playwright-report/
+
+# Authenticated uploaded media
+**/App_Data/

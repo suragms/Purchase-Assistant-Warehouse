@@ -36,6 +36,11 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         private static PurchaseItemDto MapItemToDto(PurchaseItem i) => new()
         {
+                        Unit = i.Unit,
+            FreightType = i.FreightType,
+            FreightAmount = i.FreightAmount,
+            DeliveredCharge = i.DeliveredCharge,
+            BilltyCharge = i.BilltyCharge,
             Id = i.Id,
             PurchaseOrderId = i.PurchaseOrderId,
             CatalogItemId = i.CatalogItemId,
@@ -56,6 +61,14 @@ namespace PurchaseAssistant.Infrastructure.Services
         {
             Id = p.Id,
             Version = p.Version,
+            HeaderDiscountPercent = p.HeaderDiscountPercent,
+            FreightType = p.FreightType,
+            FreightAmount = p.FreightAmount,
+            DeliveredCharge = p.DeliveredCharge,
+            BilltyCharge = p.BilltyCharge,
+            CommissionMode = p.CommissionMode,
+            CommissionPercent = p.CommissionPercent,
+            CommissionAmount = p.CommissionAmount,
             OrderNumber = p.OrderNumber,
             SupplierId = p.SupplierId,
             SupplierName = p.Supplier?.Name ?? string.Empty,
@@ -210,6 +223,14 @@ namespace PurchaseAssistant.Infrastructure.Services
                 SupplierId = dto.SupplierId,
                 BrokerId = dto.BrokerId,
                 PaymentDays = dto.PaymentDays,
+                HeaderDiscountPercent = dto.HeaderDiscountPercent,
+                FreightType = dto.FreightType,
+                FreightAmount = dto.FreightAmount,
+                DeliveredCharge = dto.DeliveredCharge,
+                BilltyCharge = dto.BilltyCharge,
+                CommissionMode = dto.CommissionMode,
+                CommissionPercent = dto.CommissionPercent,
+                CommissionAmount = dto.CommissionAmount,
                 Notes = dto.Notes,
                 Status = PurchaseStatus.Draft,
                 PaymentState = PaymentState.Pending,
@@ -229,6 +250,11 @@ namespace PurchaseAssistant.Infrastructure.Services
                     CatalogItemId = itemDto.CatalogItemId,
                     OrderedQuantity = itemDto.OrderedQuantity,
                     ReceivedQuantity = 0,
+                    Unit = itemDto.Unit,
+                    FreightType = itemDto.FreightType,
+                    FreightAmount = itemDto.FreightAmount,
+                    DeliveredCharge = itemDto.DeliveredCharge,
+                    BilltyCharge = itemDto.BilltyCharge,
                     UnitPrice = itemDto.UnitPrice,
                     DiscountPercent = itemDto.DiscountPercent,
                     TaxPercent = itemDto.TaxPercent,
@@ -240,7 +266,7 @@ namespace PurchaseAssistant.Infrastructure.Services
             }
 
             order.Subtotal = subtotal;
-            order.GrandTotal = subtotal + order.TaxTotal;
+            order.GrandTotal = PurchaseInputLimits.GrandTotal(dto);
 
             _context.Purchases.Add(order);
             AddActivity(order, "PurchaseDraftCreated", new { toStatus = "Draft" });
@@ -267,7 +293,7 @@ namespace PurchaseAssistant.Infrastructure.Services
                 KgPerUnit = i.KgPerUnit, LandingCostPerKg = i.LandingCostPerKg, LineTotal = PurchaseInputLimits.LineTotal(i), Notes = i.Notes
             }).ToList();
             result.Subtotal = dto.Items.Sum(PurchaseInputLimits.LineSubtotal);
-            result.GrandTotal = result.Subtotal + result.TaxTotal;
+            result.GrandTotal = PurchaseInputLimits.GrandTotal(dto);
             return result;
         }
 
@@ -311,8 +337,8 @@ namespace PurchaseAssistant.Infrastructure.Services
                 throw new InvalidOperationException("Only purchase orders in Draft status can be updated.");
 
             ValidateVersion(order, dto.ExpectedVersion);
-            if (_currentUser.Role != "Owner" && (dto.PaymentDays != order.PaymentDays || (order.TaxTotal > 0 && order.Items.All(i => i.TaxPercent == 0)) || dto.Items.Any(input =>
-                !order.Items.Any(existing => existing.CatalogItemId == input.CatalogItemId && existing.UnitPrice == input.UnitPrice
+            if (_currentUser.Role != "Owner" && (dto.HeaderDiscountPercent != order.HeaderDiscountPercent || dto.FreightType != order.FreightType || dto.FreightAmount != order.FreightAmount || dto.DeliveredCharge != order.DeliveredCharge || dto.BilltyCharge != order.BilltyCharge || dto.CommissionMode != order.CommissionMode || dto.CommissionPercent != order.CommissionPercent || dto.CommissionAmount != order.CommissionAmount || dto.PaymentDays != order.PaymentDays || (order.TaxTotal > 0 && order.Items.All(i => i.TaxPercent == 0)) || dto.Items.Any(input =>
+                !order.Items.Any(existing => existing.CatalogItemId == input.CatalogItemId && existing.UnitPrice == input.UnitPrice && existing.Unit == input.Unit && existing.FreightType == input.FreightType && existing.FreightAmount == input.FreightAmount && existing.DeliveredCharge == input.DeliveredCharge && existing.BilltyCharge == input.BilltyCharge
                     && existing.KgPerUnit == input.KgPerUnit && existing.LandingCostPerKg == input.LandingCostPerKg
                     && existing.TaxPercent == input.TaxPercent && existing.DiscountPercent == input.DiscountPercent))))
                 throw new UnauthorizedAccessException("Only an owner can change existing purchase financial values.");
@@ -340,6 +366,14 @@ namespace PurchaseAssistant.Infrastructure.Services
             order.SupplierId = dto.SupplierId;
             order.BrokerId = dto.BrokerId;
             order.PaymentDays = dto.PaymentDays;
+            order.HeaderDiscountPercent = dto.HeaderDiscountPercent;
+            order.FreightType = dto.FreightType;
+            order.FreightAmount = dto.FreightAmount;
+            order.DeliveredCharge = dto.DeliveredCharge;
+            order.BilltyCharge = dto.BilltyCharge;
+            order.CommissionMode = dto.CommissionMode;
+            order.CommissionPercent = dto.CommissionPercent;
+            order.CommissionAmount = dto.CommissionAmount;
             order.Notes = dto.Notes;
             order.UpdatedAt = DateTime.UtcNow;
             order.TaxTotal = 0;
@@ -361,6 +395,11 @@ namespace PurchaseAssistant.Infrastructure.Services
                     CatalogItemId = itemDto.CatalogItemId,
                     OrderedQuantity = itemDto.OrderedQuantity,
                     ReceivedQuantity = 0,
+                    Unit = itemDto.Unit,
+                    FreightType = itemDto.FreightType,
+                    FreightAmount = itemDto.FreightAmount,
+                    DeliveredCharge = itemDto.DeliveredCharge,
+                    BilltyCharge = itemDto.BilltyCharge,
                     UnitPrice = itemDto.UnitPrice,
                     DiscountPercent = itemDto.DiscountPercent,
                     TaxPercent = itemDto.TaxPercent,
@@ -372,7 +411,7 @@ namespace PurchaseAssistant.Infrastructure.Services
             }
 
             order.Subtotal = subtotal;
-            order.GrandTotal = subtotal + order.TaxTotal;
+            order.GrandTotal = PurchaseInputLimits.GrandTotal(dto);
 
             AddActivity(order, "PurchaseDraftUpdated", new { toStatus = "Draft" });
             await _context.SaveChangesAsync();

@@ -1,3 +1,4 @@
+import { PwaUpdate } from './components/PwaUpdate';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { AppRouter } from './router';
@@ -9,7 +10,7 @@ const queryClient = new QueryClient();
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <AppRouter />
+      <AppRouter /><PwaUpdate />
     </QueryClientProvider>
   </React.StrictMode>,
 );

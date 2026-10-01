@@ -105,7 +105,7 @@ namespace PurchaseAssistant.UnitTests.Services
             // Arrange
             var item = await CreateTestItem(current: 50, reserved: 0);
             var originalVersion = item.RowVersion;
-            var req = new AdjustStockRequestDto { QuantityDelta = 25, ExpectedVersion = originalVersion };
+            var req = new AdjustStockRequestDto { Reason = "Regression stock adjustment", QuantityDelta = 25, ExpectedVersion = originalVersion };
 
             // Act
             var res = await _sut.AdjustStockAsync(item.Id, req);
@@ -127,7 +127,7 @@ namespace PurchaseAssistant.UnitTests.Services
         {
             // Arrange
             var item = await CreateTestItem(current: 50, reserved: 20); // Available is 30
-            var req = new AdjustStockRequestDto { QuantityDelta = -40, ExpectedVersion = item.RowVersion }; // Reduces by 40, leading to -10 available
+            var req = new AdjustStockRequestDto { Reason = "Regression stock adjustment", QuantityDelta = -40, ExpectedVersion = item.RowVersion }; // Reduces by 40, leading to -10 available
 
             // Act & Assert
             var act = async () => await _sut.AdjustStockAsync(item.Id, req);
@@ -170,7 +170,7 @@ namespace PurchaseAssistant.UnitTests.Services
         {
             // Arrange
             var item = await CreateTestItem(current: 50);
-            var req = new AdjustStockRequestDto { QuantityDelta = 10, ExpectedVersion = Guid.NewGuid() }; // Invalid version
+            var req = new AdjustStockRequestDto { Reason = "Regression stock adjustment", QuantityDelta = 10, ExpectedVersion = Guid.NewGuid() }; // Invalid version
 
             // Act & Assert
             var act = async () => await _sut.AdjustStockAsync(item.Id, req);

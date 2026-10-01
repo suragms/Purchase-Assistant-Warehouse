@@ -30,7 +30,9 @@ using System.Security.Cryptography.X509Certificates;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers(options => options.Filters.Add<OwnerFinancialResultFilter>());
+builder.Services.AddControllers(options => { options.Filters.Add<OwnerFinancialResultFilter>(); options.Filters.Add<BusinessEventFilter>(); });
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<BusinessEvents>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 if (builder.Environment.IsProduction()) ProductionConfiguration.Validate(builder.Configuration);
@@ -93,6 +95,9 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IOperationsService, OperationsService>();
+builder.Services.AddSingleton<IBusinessLogoStorage>(new BusinessLogoStorage(
+    builder.Environment.IsDevelopment() ? builder.Configuration["Images:StoragePath"] ?? Path.Combine(builder.Environment.ContentRootPath, "App_Data", "logos") : builder.Configuration["Images:StoragePath"]));
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<ICurrentUserService>(sp => sp.GetRequiredService<CurrentUserService>());
@@ -125,6 +130,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     {
         options.Events = new JwtBearerEvents
         {
+            OnMessageReceived = context => {
+                if (context.HttpContext.Request.Path.StartsWithSegments("/api/v1/realtime") && context.Request.Query.TryGetValue("access_token", out var token)) context.Token = token;
+                return Task.CompletedTask;
+            },
             OnTokenValidated = async context =>
             {
                 var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
@@ -153,7 +162,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("RequireSelectedBusiness", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId"));
     // Define commonly used policies safely
     options.AddPolicy("RequireUsersView", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.UsersView)));
-    options.AddPolicy("RequireUsersManage", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.UsersManage)));
+    options.AddPolicy("RequireUsersManage", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").RequireRole("Owner", "Admin", "SuperAdmin").AddRequirements(new PermissionRequirement(Permissions.UsersManage)));
     options.AddPolicy("RequireCatalogView", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.CatalogView)));
     options.AddPolicy("RequireCatalogCreate", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.CatalogCreate)));
     options.AddPolicy("RequireCatalogEdit", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.CatalogEdit)));
@@ -248,6 +257,7 @@ app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<BusinessEventsHub>("/api/v1/realtime", options => options.CloseOnAuthenticationExpiration = true);
 app.MapGet("/health/live", () => Results.Ok(new { status = "alive" })).AllowAnonymous();
 app.MapGet("/health/ready", async (AppDbContext db, CancellationToken ct) =>
 {

@@ -66,8 +66,11 @@ namespace PurchaseAssistant.Infrastructure.Services
             Guid? catalogItemId = dto.CatalogItemId;
             string? unit = dto.Unit;
 
+            if (!PurchaseInputLimits.IsQuantityValid(dto.QtyDamaged) || dto.ItemName?.Length > 500
+                || dto.DamageType.HasValue && !Enum.IsDefined(dto.DamageType.Value) || dto.Reason.HasValue && !Enum.IsDefined(dto.Reason.Value)) throw new ArgumentException("Invalid damage details.");
             if (catalogItemId.HasValue)
             {
+                if (!await _context.PurchaseItems.AnyAsync(i => i.PurchaseOrderId == purchaseOrderId && i.CatalogItemId == catalogItemId.Value && i.BusinessId == businessId)) throw new ArgumentException("Item is not on this purchase.");
                 var catalogItem = await _context.CatalogItems
                     .AsNoTracking()
                     .FirstOrDefaultAsync(c => c.Id == catalogItemId.Value && c.BusinessId == businessId)
@@ -100,7 +103,7 @@ namespace PurchaseAssistant.Infrastructure.Services
                 DamageType = dto.DamageType.HasValue ? ToSnakeCase(dto.DamageType.Value.ToString()) : "damaged",
                 Reason = dto.Reason.HasValue ? ToSnakeCase(dto.Reason.Value.ToString()) : null,
                 Status = StatusPending,
-                PhotoUrl = dto.PhotoUrl,
+                PhotoUrl = PurchaseAssistant.Application.DTOs.SafeImageUrl.Validate(dto.PhotoUrl),
                 Notes = dto.Notes,
                 ReportedByUserId = _currentUser.UserId,
                 CreatedAt = DateTime.UtcNow,
@@ -110,13 +113,19 @@ namespace PurchaseAssistant.Infrastructure.Services
             _context.PurchaseDamageReports.Add(report);
             await _context.SaveChangesAsync();
 
+            if (dto.EmitNotification)
+            {
+                var recipients = await _context.Memberships.Where(m => m.BusinessId == businessId && (m.Role == PurchaseAssistant.Domain.Enums.Role.Owner || m.Role == PurchaseAssistant.Domain.Enums.Role.Admin || m.Role == PurchaseAssistant.Domain.Enums.Role.Manager)).Select(m => m.UserId).ToListAsync();
+                var notifications = new NotificationService(_context);
+                foreach (var recipient in recipients) await notifications.CreateNotificationAsync(businessId, recipient, PurchaseAssistant.Domain.Enums.NotificationType.VerificationRequired, "Damage reported", "A purchase damage report requires review.", "DamageReport", report.Id);
+            }
             return await GetReportDtoAsync(report.Id);
         }
 
         public async Task<DamageReportDto> UpdateDamageReportStatusAsync(Guid purchaseOrderId, Guid reportId, UpdateDamageReportStatusDto dto)
         {
             // Cannot set status back to Pending
-            if (dto.Status == DamageStatus.Pending)
+            if (!Enum.IsDefined(dto.Status) || dto.Status == DamageStatus.Pending)
                 throw new ArgumentException("Cannot set status back to Pending.");
 
             // Explicit ownership check: reportId must belong to this purchaseOrderId (tenant guard via query filter)

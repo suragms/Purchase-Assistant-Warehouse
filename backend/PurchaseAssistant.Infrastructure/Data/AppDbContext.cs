@@ -34,6 +34,8 @@ namespace PurchaseAssistant.Infrastructure.Data
         public DbSet<PurchaseItem> PurchaseItems => Set<PurchaseItem>();
         public DbSet<Notification> Notifications => Set<Notification>();
         public DbSet<PurchaseDamageReport> PurchaseDamageReports => Set<PurchaseDamageReport>();
+        public DbSet<DailyUsageLog> DailyUsageLogs => Set<DailyUsageLog>();
+        public DbSet<DailyOperationSnapshot> DailyOperationSnapshots => Set<DailyOperationSnapshot>();
 
         public Guid CurrentBusinessId => _tenantProvider?.GetBusinessId() ?? Guid.Empty;
 
@@ -61,6 +63,7 @@ namespace PurchaseAssistant.Infrastructure.Data
             modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
             ConfigureTenantRelationships(modelBuilder);
 
+            modelBuilder.Entity<UserSettings>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
             // Multi-tenant Query Filters
             modelBuilder.Entity<Category>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
             modelBuilder.Entity<CategoryType>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
@@ -77,6 +80,10 @@ namespace PurchaseAssistant.Infrastructure.Data
             modelBuilder.Entity<PurchaseItem>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
             modelBuilder.Entity<Notification>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
             modelBuilder.Entity<PurchaseDamageReport>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
+            modelBuilder.Entity<ChecklistTemplate>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
+            modelBuilder.Entity<ChecklistCompletion>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
+            modelBuilder.Entity<DailyUsageLog>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
+            modelBuilder.Entity<DailyOperationSnapshot>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
         }
 
         private static void ConfigureTenantRelationships(ModelBuilder model)
@@ -122,6 +129,8 @@ namespace PurchaseAssistant.Infrastructure.Data
                 .HasForeignKey(e => new { e.BusinessId, e.PurchaseOrderId }).HasPrincipalKey(e => new { e.BusinessId, e.Id }).OnDelete(DeleteBehavior.Cascade);
             model.Entity<PurchaseDamageReport>().HasOne(e => e.CatalogItem).WithMany()
                 .HasForeignKey(e => new { e.BusinessId, e.CatalogItemId }).HasPrincipalKey(e => new { e.BusinessId, e.Id }).OnDelete(DeleteBehavior.SetNull);
+            model.Entity<DailyUsageLog>().HasOne(e => e.CatalogItem).WithMany()
+                .HasForeignKey(e => new { e.BusinessId, e.CatalogItemId }).HasPrincipalKey(e => new { e.BusinessId, e.Id }).OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

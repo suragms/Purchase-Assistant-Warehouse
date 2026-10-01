@@ -1,3 +1,4 @@
+import { SafeImage } from '../../components/SafeImage';
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Edit, Trash2 } from 'lucide-react';
@@ -15,6 +16,7 @@ export default function BrokerList() {
 
   // Form State
   const [name, setName] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -62,7 +64,7 @@ export default function BrokerList() {
 
   const handleOpenNew = () => {
     setEditingBroker(null);
-    setName('');
+    setName(''); setImageUrl('');
     setIsActive(true);
     setErrorMsg('');
     setModalOpen(true);
@@ -70,7 +72,7 @@ export default function BrokerList() {
 
   const handleOpenEdit = (b: Broker) => {
     setEditingBroker(b);
-    setName(b.name);
+    setName(b.name); setImageUrl(b.imageUrl ?? '');
     setIsActive(b.isActive);
     setErrorMsg('');
     setModalOpen(true);
@@ -84,7 +86,7 @@ export default function BrokerList() {
       setErrorMsg('Name is required');
       return;
     }
-    saveMutation.mutate({ name, isActive });
+    saveMutation.mutate({ name, isActive, imageUrl: imageUrl || undefined });
   };
 
   return (
@@ -117,7 +119,7 @@ export default function BrokerList() {
             <tbody className="divide-y divide-[#E2E8E6]">
               {data?.map(b => (
                 <tr key={b.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-[#0F172A]">{b.name}</td>
+                  <td className="px-4 py-3 font-medium text-[#0F172A]">{b.name}<SafeImage src={b.imageUrl} alt={b.name} /></td>
                   <td className="px-4 py-3 text-right text-gray-500">{b.linkedSuppliersCount}</td>
                   <td className="px-4 py-3">
                     {b.isActive ? <Badge variant="green">Active</Badge> : <Badge variant="gray">Inactive</Badge>}
@@ -152,6 +154,7 @@ export default function BrokerList() {
         <form onSubmit={handleSave} className="space-y-4">
           {errorMsg && <div className="text-sm text-red-600">{errorMsg}</div>}
 
+          <Input label="Image URL (HTTPS)" type="url" value={imageUrl} onChange={e => setImageUrl(e.target.value)} />
           <Input
             label="Broker Name"
             value={name}

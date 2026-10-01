@@ -1,3 +1,4 @@
+import { RealtimeUpdates } from '../components/RealtimeUpdates';
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
@@ -6,6 +7,7 @@ import {
   Boxes, Building2, ShoppingBag, BarChart3, Bell
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
+import { hasPermission } from '../auth/Guards';
 import { cn } from '../lib/cn';
 import { GlobalSearch } from '../components/search/GlobalSearch';
 import apiClient from '../api/apiClient';
@@ -16,15 +18,16 @@ interface NavItem {
   label: string;
   icon: React.ReactNode;
   to?: string;
-  children?: { label: string; to: string }[];
+  permission?: string;
+  children?: { label: string; to: string; permission?: string }[];
 }
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" />, to: '/dashboard' },
-  { label: 'Reports', icon: <BarChart3 className="h-4 w-4" />, to: '/reports' },
+  { label: 'Reports', permission: 'reports.view', icon: <BarChart3 className="h-4 w-4" />, to: '/reports' },
   { label: 'Notifications', icon: <Bell className="h-4 w-4" />, to: '/notifications' },
   {
-    label: 'Catalog', icon: <Package className="h-4 w-4" />, children: [
+    label: 'Catalog', permission: 'catalog.view', icon: <Package className="h-4 w-4" />, children: [
       { label: 'Items', to: '/catalog/items' },
       { label: 'Categories', to: '/catalog/categories' },
       { label: 'Types', to: '/catalog/types' },
@@ -32,22 +35,26 @@ const navItems: NavItem[] = [
       { label: 'Duplicates', to: '/catalog/duplicates' },
     ]
   },
-  { label: 'Suppliers', icon: <Truck className="h-4 w-4" />, to: '/suppliers' },
-  { label: 'Brokers', icon: <Building2 className="h-4 w-4" />, to: '/brokers' },
+  { label: 'Suppliers', permission: 'supplier.view', icon: <Truck className="h-4 w-4" />, to: '/suppliers' },
+  { label: 'Brokers', permission: 'broker.view', icon: <Building2 className="h-4 w-4" />, to: '/brokers' },
   {
-    label: 'Inventory', icon: <Boxes className="h-4 w-4" />, children: [
+    label: 'Inventory', permission: 'stock.view', icon: <Boxes className="h-4 w-4" />, children: [
       { label: 'Overview', to: '/inventory/overview' },
       { label: 'Stock List', to: '/inventory/all' },
+      { label: 'Low Stock', to: '/inventory/low-stock' },
+      { label: 'Out of Stock', to: '/inventory/out-of-stock' },
     ]
   },
   {
-    label: 'Purchases', icon: <ShoppingBag className="h-4 w-4" />, children: [
+    label: 'Purchases', permission: 'purchase.view', icon: <ShoppingBag className="h-4 w-4" />, children: [
       { label: 'Overview', to: '/purchases/overview' },
       { label: 'All Purchases', to: '/purchases/list' },
-      { label: 'New Purchase', to: '/purchases/new' },
+      { label: 'New Purchase', to: '/purchases/new', permission: 'purchase.create' },
     ]
   },
-  { label: 'Users', icon: <Users className="h-4 w-4" />, to: '/users' },
+  { label: 'Daily Operations', icon: <Boxes className="h-4 w-4" />, to: '/operations' },
+  { label: 'Settings', icon: <Building2 className="h-4 w-4" />, to: '/settings' },
+  { label: 'Users', permission: 'users.view', icon: <Users className="h-4 w-4" />, to: '/users' },
 ];
 
 const SidebarNavItem: React.FC<{ item: NavItem; onNavigate?: () => void }> = ({ item, onNavigate }) => {
@@ -172,7 +179,7 @@ export const AppShell: React.FC = () => {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-1" aria-label="Main navigation">
-        {navItems.map((item) => (
+        {navItems.filter(item => hasPermission(user, item.permission)).map(item => ({ ...item, children: item.children?.filter(child => hasPermission(user, child.permission)) })).map((item) => (
           <SidebarNavItem key={item.label} item={item} onNavigate={() => setMobileOpen(false)} />
         ))}
       </nav>
@@ -196,7 +203,7 @@ export const AppShell: React.FC = () => {
   );
 
   return (
-    <div className="flex h-screen bg-[#F7F9F6] overflow-hidden">
+    <div className="flex h-screen bg-[#F7F9F6] overflow-hidden"><RealtimeUpdates />
       {/* Desktop Sidebar */}
       <div className="hidden md:flex flex-col bg-[#0E4F46] shrink-0">
         <Sidebar />

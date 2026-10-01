@@ -264,8 +264,8 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         private async Task ValidateVariantAsync(Guid itemId, VariantDto dto, Guid? exclude, CancellationToken cancellationToken)
         {
-            if (string.IsNullOrWhiteSpace(dto.Name) || dto.Name.Trim().Length > 150)
-                throw new ArgumentException("Enter a variant name of 1 to 150 characters.");
+            if (string.IsNullOrWhiteSpace(dto.Name) || dto.Name.Trim().Length > 512)
+                throw new ArgumentException("Enter a variant name of 1 to 512 characters.");
             if (dto.KgPerUnit.HasValue && (dto.KgPerUnit <= 0 || dto.KgPerUnit > PurchaseAssistant.Application.DTOs.Purchase.PurchaseInputLimits.MaxValue || decimal.Round(dto.KgPerUnit.Value, 4) != dto.KgPerUnit))
                 throw new ArgumentException("Weight must be positive, within the supported numeric range and have at most four decimal places.");
             var normalized = dto.Name.Trim().ToLowerInvariant();

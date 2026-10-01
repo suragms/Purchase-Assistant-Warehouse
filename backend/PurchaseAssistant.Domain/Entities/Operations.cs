@@ -42,11 +42,17 @@ namespace PurchaseAssistant.Domain.Entities
         public Guid CatalogItemId { get; set; }
         public CatalogItem CatalogItem { get; set; } = null!;
 
-        /// <summary>How much was consumed/used</summary>
-        public decimal QuantityUsed { get; set; }
+        /// <summary>Stock level at start of day</summary>
+        public decimal OpeningQty { get; set; }
 
-        /// <summary>Stock level at time of logging (snapshot)</summary>
-        public decimal StockAtTime { get; set; }
+        /// <summary>Amount purchased/received during day</summary>
+        public decimal PurchasedQty { get; set; }
+
+        /// <summary>How much was consumed/used</summary>
+        public decimal UsedQty { get; set; }
+
+        /// <summary>Stock level at end of day</summary>
+        public decimal ClosingQty { get; set; }
 
         /// <summary>Optional notes about the usage</summary>
         public string? Notes { get; set; }

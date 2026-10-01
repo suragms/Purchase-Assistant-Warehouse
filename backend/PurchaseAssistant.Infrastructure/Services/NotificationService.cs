@@ -106,6 +106,9 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task CreateNotificationAsync(Guid businessId, Guid userId, NotificationType type, string title, string message, string? referenceType = null, Guid? referenceId = null)
         {
+            var settings = await _context.Set<UserSettings>().IgnoreQueryFilters().SingleOrDefaultAsync(s => s.BusinessId == businessId && s.UserId == userId);
+            var kind = type switch { NotificationType.LowStock or NotificationType.OutOfStock => "low_stock", NotificationType.StockVariance => "stock_variance", NotificationType.DeliveryPending or NotificationType.VerificationRequired => "delivery", _ => "staff_alert" };
+            if (settings != null && (!settings.NotificationsEnabled || !(System.Text.Json.JsonSerializer.Deserialize<string[]>(settings.NotificationKindsJson) ?? []).Contains(kind))) return;
             // Deduplication: prevent creating another identical Unread notification
             bool exists = await _context.Notifications
                 .AnyAsync(n => n.BusinessId == businessId
@@ -119,6 +122,7 @@ namespace PurchaseAssistant.Infrastructure.Services
             var notification = new Notification
             {
                 BusinessId = businessId,
+                DedupeKey = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes($"{type}:{referenceType}:{referenceId}"))),
                 UserId = userId,
                 Type = type,
                 Title = title,
@@ -130,7 +134,8 @@ namespace PurchaseAssistant.Infrastructure.Services
             };
 
             _context.Notifications.Add(notification);
-            await _context.SaveChangesAsync();
+            try { await _context.SaveChangesAsync(); }
+            catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException { SqlState: "23505" }) { _context.Entry(notification).State = EntityState.Detached; }
         }
     }
 }

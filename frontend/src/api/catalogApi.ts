@@ -58,6 +58,7 @@ export interface Supplier {
 }
 
 export interface Broker {
+  imageUrl?: string;
   id: string;
   name: string;
   isActive: boolean;

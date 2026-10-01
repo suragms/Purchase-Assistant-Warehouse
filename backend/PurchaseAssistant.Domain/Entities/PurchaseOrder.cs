@@ -7,6 +7,15 @@ namespace PurchaseAssistant.Domain.Entities
 {
     public class PurchaseOrder : TenantEntity
     {
+        public decimal HeaderDiscountPercent { get; set; }
+        public string FreightType { get; set; } = "separate";
+        public decimal FreightAmount { get; set; }
+        public decimal DeliveredCharge { get; set; }
+        public decimal BilltyCharge { get; set; }
+        public string CommissionMode { get; set; } = "percent";
+        public decimal CommissionPercent { get; set; }
+        public decimal CommissionAmount { get; set; }
+
         public string OrderNumber { get; set; } = string.Empty;
         // PostgreSQL's built-in xmin supplies a store-generated concurrency token.
         public uint Version { get; set; }

@@ -7,6 +7,21 @@ namespace PurchaseAssistant.Application.DTOs.Purchase
 {
     public class PurchaseOrderDto
     {
+        [FinancialField]
+        public decimal HeaderDiscountPercent { get; set; }
+        public string FreightType { get; set; } = "separate";
+        [FinancialField]
+        public decimal FreightAmount { get; set; }
+        [FinancialField]
+        public decimal DeliveredCharge { get; set; }
+        [FinancialField]
+        public decimal BilltyCharge { get; set; }
+        public string CommissionMode { get; set; } = "percent";
+        [FinancialField]
+        public decimal CommissionPercent { get; set; }
+        [FinancialField]
+        public decimal CommissionAmount { get; set; }
+
         public Guid Id { get; set; }
         public uint Version { get; set; }
         public string OrderNumber { get; set; } = string.Empty;
@@ -43,6 +58,15 @@ namespace PurchaseAssistant.Application.DTOs.Purchase
 
     public class PurchaseItemDto
     {
+        public string Unit { get; set; } = "PCS";
+        public string FreightType { get; set; } = "separate";
+        [FinancialField]
+        public decimal? FreightAmount { get; set; }
+        [FinancialField]
+        public decimal? DeliveredCharge { get; set; }
+        [FinancialField]
+        public decimal? BilltyCharge { get; set; }
+
         public Guid Id { get; set; }
         public Guid PurchaseOrderId { get; set; }
         public Guid CatalogItemId { get; set; }
@@ -69,6 +93,21 @@ namespace PurchaseAssistant.Application.DTOs.Purchase
 
     public class UpsertPurchaseOrderDto
     {
+        [FinancialField]
+        public decimal HeaderDiscountPercent { get; set; }
+        public string FreightType { get; set; } = "separate";
+        [FinancialField]
+        public decimal FreightAmount { get; set; }
+        [FinancialField]
+        public decimal DeliveredCharge { get; set; }
+        [FinancialField]
+        public decimal BilltyCharge { get; set; }
+        public string CommissionMode { get; set; } = "percent";
+        [FinancialField]
+        public decimal CommissionPercent { get; set; }
+        [FinancialField]
+        public decimal CommissionAmount { get; set; }
+
         public string? PreviewToken { get; set; }
         public uint? ExpectedVersion { get; set; }
         public string? OrderNumber { get; set; }
@@ -102,6 +141,15 @@ namespace PurchaseAssistant.Application.DTOs.Purchase
 
     public class UpsertPurchaseItemDto
     {
+        public string Unit { get; set; } = "PCS";
+        public string FreightType { get; set; } = "separate";
+        [FinancialField]
+        public decimal? FreightAmount { get; set; }
+        [FinancialField]
+        public decimal? DeliveredCharge { get; set; }
+        [FinancialField]
+        public decimal? BilltyCharge { get; set; }
+
         public Guid CatalogItemId { get; set; }
         [OperationalNumeric]
         public decimal OrderedQuantity { get; set; }

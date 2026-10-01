@@ -38,11 +38,12 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
   const [brokerId, setBrokerId] = useState('');
   const [notes, setNotes] = useState('');
   const [paymentDays, setPaymentDays] = useState('');
+  const [charges, setCharges] = useState<Partial<UpsertPurchaseOrderDto>>({ freightType: 'separate', commissionMode: 'percent' });
   const [items, setItems] = useState<UpsertPurchaseItemDto[]>([
     { catalogItemId: '', orderedQuantity: 1, unitPrice: 0, notes: '' }
   ]);
 
-  useEffect(() => { setPreview(null); }, [supplierId, brokerId, notes, items, paymentDays]);
+  useEffect(() => { setPreview(null); }, [supplierId, brokerId, notes, items, paymentDays, charges]);
 
   const { data: suppliersData } = useQuery({
     queryKey: ['suppliers', 'list'],
@@ -71,8 +72,10 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
       setBrokerId(existingOrder.brokerId || '');
       setNotes(existingOrder.notes || '');
       setPaymentDays(existingOrder.paymentDays?.toString() ?? '');
+      setCharges({ headerDiscountPercent: existingOrder.headerDiscountPercent, freightType: existingOrder.freightType, freightAmount: existingOrder.freightAmount, deliveredCharge: existingOrder.deliveredCharge, billtyCharge: existingOrder.billtyCharge, commissionMode: existingOrder.commissionMode, commissionPercent: existingOrder.commissionPercent, commissionAmount: existingOrder.commissionAmount });
       setItems(existingOrder.items.map(i => ({
         catalogItemId: i.catalogItemId,
+        unit: i.unit ?? catalogData?.data?.find(c => c.id === i.catalogItemId)?.defaultUnit ?? 'PCS', freightType: i.freightType, freightAmount: i.freightAmount, deliveredCharge: i.deliveredCharge, billtyCharge: i.billtyCharge,
         orderedQuantity: i.orderedQuantity,
         unitPrice: i.unitPrice ?? 0,
         discountPercent: i.discountPercent,
@@ -160,6 +163,7 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
       setSubmitError('Payment terms must be between 0 and 3650 days.'); return;
     }
     const dto: UpsertPurchaseOrderDto = {
+      ...charges,
       ...(paymentDays !== '' ? { paymentDays: Number(paymentDays) } : {}),
       expectedVersion: edit ? existingOrder?.version : undefined,
       orderNumber: edit ? existingOrder?.orderNumber : orderNumber.current,
@@ -168,6 +172,7 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
       notes: notes || undefined,
       items: items.map(i => ({
         catalogItemId: i.catalogItemId,
+        unit: i.unit ?? catalogData?.data?.find(c => c.id === i.catalogItemId)?.defaultUnit ?? 'PCS', freightType: i.freightType, freightAmount: i.freightAmount, deliveredCharge: i.deliveredCharge, billtyCharge: i.billtyCharge,
         orderedQuantity: Number(i.orderedQuantity),
         unitPrice: Number(i.unitPrice),
         discountPercent: i.discountPercent,
@@ -305,6 +310,9 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
                   </select>
                 </div>
 
+                <div className="md:col-span-12 grid sm:grid-cols-3 gap-2">
+                  {(['freightAmount', 'deliveredCharge', 'billtyCharge'] as const).map(key => <label className="text-xs" key={key}>{{ freightAmount: 'Line freight (INR)', deliveredCharge: 'Line delivered charge (INR)', billtyCharge: 'Line billty charge (INR)' }[key]}<input type="number" min="0" step="0.01" className="block w-full border rounded p-2" value={item[key] ?? ''} onChange={e => handleItemChange(index, key, e.target.value === '' ? undefined : Number(e.target.value))} /></label>)}
+                </div>
                 <div className="md:col-span-2">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Qty *</label>
                   <input
@@ -400,6 +408,11 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
           </div>
         </div>
 
+      <section className="rounded-xl border bg-white p-4 space-y-4"><h2 className="text-lg font-semibold">Purchase charges</h2><p className="text-sm text-slate-500">The backend applies header discount, freight and commission when you preview. Line charges take precedence over header freight, delivered and billty charges.</p><div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {([['headerDiscountPercent', 'Header discount (%)'], ['freightAmount', 'Freight (INR)'], ['deliveredCharge', 'Delivered charge (INR)'], ['billtyCharge', 'Billty charge (INR)'], ['commissionPercent', 'Commission (%)'], ['commissionAmount', 'Flat commission (INR)']] as const).map(([key, label]) => <label key={key} className="text-sm">{label}<input aria-label={label} type="number" min="0" step="0.01" className="block w-full border rounded p-3 mt-1" value={charges[key] ?? ''} onChange={e => setCharges({ ...charges, [key]: e.target.value === '' ? 0 : Number(e.target.value) })} /></label>)}
+        <label className="text-sm">Freight type<select className="block w-full border rounded p-3 mt-1" value={charges.freightType ?? 'separate'} onChange={e => setCharges({ ...charges, freightType: e.target.value })}><option value="separate">Separate</option><option value="included">Included</option></select></label>
+        <label className="text-sm">Commission mode<select className="block w-full border rounded p-3 mt-1" value={charges.commissionMode ?? 'percent'} onChange={e => setCharges({ ...charges, commissionMode: e.target.value })}>{['percent','flat_invoice','flat_kg','flat_bag','flat_box','flat_tin'].map(mode => <option key={mode} value={mode}>{mode.replaceAll('_', ' ')}</option>)}</select></label>
+      </div></section>
         {preview && <div role="status" className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900">
           Review the server preview above. Saving creates a draft; confirm the purchase separately after review.
         </div>}

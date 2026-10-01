@@ -541,6 +541,7 @@ public class ReferenceAuditSafetyTests : IDisposable
     [InlineData(Role.Manager, "purchase.create")]
     public async Task NewMembershipGetsUsableRolePermissions(Role role, string permission)
     {
+        actor.Role = "Owner";
         var created = await new UserService(db, actor).CreateUserAsync(new() { Name = "New colleague", Email = $"{role}@test.local",
             Password = "strong-test-password", Role = role });
         var membership = await db.Memberships.SingleAsync(m => m.UserId == created.Id);

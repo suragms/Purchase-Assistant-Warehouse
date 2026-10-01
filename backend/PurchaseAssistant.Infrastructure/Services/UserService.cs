@@ -68,15 +68,26 @@ namespace PurchaseAssistant.Infrastructure.Services
         public async Task<UserDto> CreateUserAsync(CreateUserDto createUserDto)
         {
             ValidateRole(createUserDto.Role);
-            var businessId = _currentUser.BusinessId ?? Guid.Empty;
+            RequireUserAdministrator();
+            if (createUserDto.Role == Domain.Enums.Role.Owner)
+                throw new ArgumentException("New accounts must be Admin, Manager or Staff.");
+            ValidateProfile(createUserDto.Name, createUserDto.Email);
+            if (string.IsNullOrWhiteSpace(createUserDto.Password) || createUserDto.Password.Length < 8
+                || System.Text.Encoding.UTF8.GetByteCount(createUserDto.Password) > 72)
+                throw new ArgumentException("Password must have at least 8 characters and at most 72 UTF-8 bytes.");
+            createUserDto.Email = createUserDto.Email.Trim().ToLowerInvariant();
+            createUserDto.Name = createUserDto.Name.Trim();
+            var businessId = _currentUser.BusinessId!.Value;
+            if (!await _context.Businesses.AnyAsync(b => b.Id == businessId && b.IsActive))
+                throw new UnauthorizedAccessException("Select an active business.");
 
             // Check if user already exists globally by email
-            var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == createUserDto.Email);
+            var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == createUserDto.Email);
             User user;
 
             if (existingUser != null)
             {
-                user = existingUser;
+                throw new DbUpdateConcurrencyException("Email is already registered.");
             }
             else
             {
@@ -134,6 +145,14 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<bool> UpdateUserAsync(Guid id, UpdateUserDto updateUserDto)
         {
+            RequireUserAdministrator();
+            ValidateProfile(updateUserDto.Name, updateUserDto.Email);
+            if (updateUserDto.Status is not (Domain.Enums.UserStatus.Active or Domain.Enums.UserStatus.Inactive or Domain.Enums.UserStatus.Blocked))
+                throw new ArgumentException("Invalid account status.");
+            updateUserDto.Name = updateUserDto.Name.Trim();
+            updateUserDto.Email = updateUserDto.Email.Trim().ToLowerInvariant();
+            if (await _context.Users.AnyAsync(u => u.Id != id && u.Email.ToLower() == updateUserDto.Email))
+                throw new DbUpdateConcurrencyException("Email is already registered.");
             var businessId = _currentUser.BusinessId ?? Guid.Empty;
             var membership = await _context.Memberships
                 .Include(m => m.User)
@@ -162,6 +181,7 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<bool> DeleteUserAsync(Guid id)
         {
+            RequireUserAdministrator();
             var businessId = _currentUser.BusinessId ?? Guid.Empty;
             var membership = await _context.Memberships
                 .FirstOrDefaultAsync(m => m.BusinessId == businessId && m.UserId == id);
@@ -183,6 +203,21 @@ namespace PurchaseAssistant.Infrastructure.Services
                 throw new ArgumentException("This role cannot be assigned by business user management.");
             if (role == Domain.Enums.Role.Owner && _currentUser.Role is not ("Owner" or "SuperAdmin"))
                 throw new UnauthorizedAccessException("Only an owner can assign an owner membership.");
+        }
+
+        private void RequireUserAdministrator()
+        {
+            if (_currentUser.BusinessId == null || _currentUser.UserId == null
+                || _currentUser.Role is not ("Owner" or "Admin" or "SuperAdmin"))
+                throw new UnauthorizedAccessException("Only business administrators can manage users.");
+        }
+
+        private static void ValidateProfile(string name, string email)
+        {
+            if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > 150
+                || string.IsNullOrWhiteSpace(email) || email.Trim().Length > 255
+                || !new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(email.Trim()))
+                throw new ArgumentException("A name and a valid email address are required.");
         }
 
         private void ValidateProtectedMembership(Membership membership)

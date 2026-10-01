@@ -22,7 +22,7 @@ using PurchaseAssistant.Application.Interfaces;
 
 namespace PurchaseAssistant.UnitTests.AI;
 
-public class PurchaseIntentEndpointTests
+public partial class PurchaseIntentEndpointTests
 {
     private static readonly Guid UserId = Guid.NewGuid();
     private static readonly Guid BusinessId = Guid.NewGuid();

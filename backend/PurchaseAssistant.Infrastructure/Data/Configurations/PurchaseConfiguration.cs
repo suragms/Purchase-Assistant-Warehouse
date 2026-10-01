@@ -9,6 +9,12 @@ namespace PurchaseAssistant.Infrastructure.Data.Configurations
         public void Configure(EntityTypeBuilder<PurchaseOrder> builder)
         {
             builder.HasKey(e => e.Id);
+            builder.Property(e => e.HeaderDiscountPercent).HasPrecision(18, 2);
+            builder.Property(e => e.FreightAmount).HasPrecision(18, 2);
+            builder.Property(e => e.DeliveredCharge).HasPrecision(18, 2);
+            builder.Property(e => e.BilltyCharge).HasPrecision(18, 2);
+            builder.Property(e => e.CommissionPercent).HasPrecision(18, 2);
+            builder.Property(e => e.CommissionAmount).HasPrecision(18, 2);
             builder.Property(e => e.Version).IsRowVersion();
 
             builder.Property(e => e.OrderNumber).IsRequired().HasMaxLength(100);
@@ -44,6 +50,9 @@ namespace PurchaseAssistant.Infrastructure.Data.Configurations
         public void Configure(EntityTypeBuilder<PurchaseItem> builder)
         {
             builder.HasKey(e => e.Id);
+            builder.Property(e => e.FreightAmount).HasPrecision(18, 2);
+            builder.Property(e => e.DeliveredCharge).HasPrecision(18, 2);
+            builder.Property(e => e.BilltyCharge).HasPrecision(18, 2);
 
             builder.Property(e => e.OrderedQuantity).HasPrecision(18, 4);
             builder.Property(e => e.ReceivedQuantity).HasPrecision(18, 4);

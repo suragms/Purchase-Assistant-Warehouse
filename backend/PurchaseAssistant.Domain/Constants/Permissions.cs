@@ -47,8 +47,8 @@ namespace PurchaseAssistant.Domain.Constants
                 .Where(f => f.IsLiteral && f.FieldType == typeof(string)).Select(f => (string)f.GetRawConstantValue()!).ToArray(),
             Enums.Role.Manager => [CatalogView, CatalogCreate, CatalogEdit, SupplierView, SupplierCreate, SupplierEdit,
                 BrokerView, BrokerCreate, BrokerEdit, PurchaseView, PurchaseCreate, PurchaseEdit, PurchaseDelivery,
-                PurchaseVerify, PurchaseCommit, PurchaseDamageReport, PurchaseDamageApprove, StockView, StockAdjust, StockPhysical, StockSystem, ReportsView],
-            Enums.Role.Staff => [CatalogView, SupplierView, BrokerView, PurchaseView, PurchaseVerify, PurchaseDamageReport, StockView, StockPhysical],
+                PurchaseVerify, PurchaseCommit, PurchaseDamageReport, PurchaseDamageApprove, StockView, StockAdjust, StockPhysical, StockSystem, ReportsView, UsersView],
+            Enums.Role.Staff => [CatalogView, SupplierView, BrokerView, PurchaseView, PurchaseCreate, PurchaseVerify, PurchaseDamageReport, StockView, StockAdjust, StockPhysical],
             _ => []
         };
     }

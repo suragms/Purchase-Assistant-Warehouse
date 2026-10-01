@@ -1,3 +1,5 @@
+import { SafeImage } from '../SafeImage';
+import { purchaseErrorMessage } from '../../lib/purchaseValidation';
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Plus, X, Check, XCircle, RotateCcw } from 'lucide-react';
@@ -28,7 +30,7 @@ export default function DamageReportSection({ purchaseOrderId, orderItems }: Dam
   const can = (permission: string) =>
     business?.role === 'Owner' || business?.role === 'SuperAdmin' || !!business?.permissions.includes(permission);
 
-  const { data: reports = [], isLoading } = useQuery({
+  const { data: reports = [], isLoading, error, refetch } = useQuery({
     queryKey: ['damage-reports', purchaseOrderId],
     queryFn: () => damageApi.getDamageReports(purchaseOrderId),
   });
@@ -108,6 +110,7 @@ export default function DamageReportSection({ purchaseOrderId, orderItems }: Dam
         )}
       </div>
 
+      {(error || createMutation.error || updateStatusMutation.error) && <p role="alert" className="p-4 text-red-700">{purchaseErrorMessage(error || createMutation.error || updateStatusMutation.error)} <button onClick={() => void refetch()}>Retry</button></p>}
       {/* Create Damage Report Form */}
       {showForm && (
         <div className="p-6 bg-amber-50 border-b border-slate-200">
@@ -122,6 +125,8 @@ export default function DamageReportSection({ purchaseOrderId, orderItems }: Dam
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            <label className="block text-sm">Photo URL (HTTPS)<input type="url" maxLength={2000} className="block w-full border rounded p-3" value={formData.photoUrl ?? ''} onChange={e => setFormData({ ...formData, photoUrl: e.target.value || undefined })} /></label>
+            {formData.photoUrl && <SafeImage src={formData.photoUrl} alt="Damage photo preview" />}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -285,7 +290,8 @@ export default function DamageReportSection({ purchaseOrderId, orderItems }: Dam
                         </div>
                       )}
                     </div>
-                    {report.notes && (
+                    {report.photoUrl && <SafeImage src={report.photoUrl} alt="Damage evidence" />}
+                  {report.notes && (
                       <p className="text-sm text-slate-600 mt-2 italic">{report.notes}</p>
                     )}
                     <div className="text-xs text-slate-400 mt-2">

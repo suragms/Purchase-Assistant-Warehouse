@@ -5,6 +5,12 @@ namespace PurchaseAssistant.Domain.Entities
 {
     public class PurchaseItem : TenantEntity
     {
+        public string Unit { get; set; } = "PCS";
+        public string FreightType { get; set; } = "separate";
+        public decimal? FreightAmount { get; set; }
+        public decimal? DeliveredCharge { get; set; }
+        public decimal? BilltyCharge { get; set; }
+
         public Guid PurchaseOrderId { get; set; }
         public PurchaseOrder PurchaseOrder { get; set; } = null!;
         public Guid CatalogItemId { get; set; }

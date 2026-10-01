@@ -6,6 +6,7 @@ namespace PurchaseAssistant.Application.DTOs.Purchase
     /// <summary>
     /// Valid damage types verified from reference schema.
     /// </summary>
+    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
     public enum DamageType
     {
         Damaged,    // "damaged"
@@ -17,6 +18,7 @@ namespace PurchaseAssistant.Application.DTOs.Purchase
     /// <summary>
     /// Valid damage reasons verified from reference schema.
     /// </summary>
+    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
     public enum DamageReason
     {
         TornBag,    // "torn_bag"
@@ -29,6 +31,7 @@ namespace PurchaseAssistant.Application.DTOs.Purchase
     /// <summary>
     /// Valid damage status verified from reference schema.
     /// </summary>
+    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
     public enum DamageStatus
     {
         Pending,    // "pending"

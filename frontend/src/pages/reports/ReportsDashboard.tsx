@@ -1,3 +1,4 @@
+import { ExportControls } from '../../components/ExportControls';
 import { formatMoney } from '../../lib/formatMoney';
 import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -65,6 +66,7 @@ export default function ReportsDashboard() {
         </div>
       </div>
 
+      <ExportControls start={startDate} end={endDate} />
       {/* Period Comparison Metric Cards */}
       {comparisonData && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">

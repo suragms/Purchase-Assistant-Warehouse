@@ -85,6 +85,8 @@ namespace PurchaseAssistant.Application.DTOs.Catalog
 
     public class BrokerDto
     {
+        [System.ComponentModel.DataAnnotations.MaxLength(1024)]
+        public string? ImageUrl { get; set; }
         public Guid Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public bool IsActive { get; set; }

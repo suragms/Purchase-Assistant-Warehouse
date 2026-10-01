@@ -37,6 +37,7 @@ namespace PurchaseAssistant.Application.DTOs.Operations
         public List<ChecklistTaskDto> Evening { get; set; } = new();
         public int TotalTasks { get; set; }
         public int CompletedTasks { get; set; }
+        [OperationalNumeric]
         public decimal CompletionPercentage { get; set; }
     }
 
@@ -55,13 +56,18 @@ namespace PurchaseAssistant.Application.DTOs.Operations
     public class UsageLineDto
     {
         public Guid CatalogItemId { get; set; }
+        public Guid ExpectedVersion { get; set; }
         public string ItemName { get; set; } = string.Empty;
         public string ItemCode { get; set; } = string.Empty;
         public string Unit { get; set; } = string.Empty;
         [OperationalNumeric]
+        public decimal OpeningQty { get; set; }
+        [OperationalNumeric]
+        public decimal PurchasedQty { get; set; }
+        [OperationalNumeric]
         public decimal QuantityUsed { get; set; }
         [OperationalNumeric]
-        public decimal CurrentStock { get; set; }
+        public decimal ClosingQty { get; set; }
         public string? Notes { get; set; }
         public DateTime LoggedAt { get; set; }
         public string? LoggedByUser { get; set; }
@@ -86,9 +92,10 @@ namespace PurchaseAssistant.Application.DTOs.Operations
     {
         [Required]
         public Guid CatalogItemId { get; set; }
+        public Guid ExpectedVersion { get; set; }
 
         [Required]
-        [Range(0.001, (double)decimal.MaxValue, ErrorMessage = "Quantity used must be greater than 0")]
+        [Range(0, 1000000000)]
         [OperationalNumeric]
         public decimal QuantityUsed { get; set; }
 
@@ -142,7 +149,26 @@ namespace PurchaseAssistant.Application.DTOs.Operations
         public DateTime EndDate { get; set; }
         public int TotalDays { get; set; }
         public int CompletedDays { get; set; }
+        [OperationalNumeric]
         public decimal AverageCompletionRate { get; set; }
         public List<string> FrequentlySkippedTasks { get; set; } = new();
+    }
+}
+namespace PurchaseAssistant.Application.DTOs.Operations
+{
+    public class OperationsReportSummaryDto
+    {
+        public string Method { get; set; } = "RULE-BASED";
+        public List<OperationsReportItemDto> Items { get; set; } = new();
+    }
+    public class OperationsReportItemDto
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = "";
+        [OperationalNumeric] public decimal CurrentStock { get; set; }
+        [OperationalNumeric] public decimal Used7d { get; set; }
+        [OperationalNumeric] public decimal Used30d { get; set; }
+        public int IdleDays { get; set; }
+        public string MovementStatus { get; set; } = "";
     }
 }
