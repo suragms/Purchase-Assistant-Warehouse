@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace PurchaseAssistant.Web.Controllers
 {
-    [Authorize]
+    [Authorize(Policy = "RequireSelectedBusiness")]
     [ApiController]
     [Route("api/v1/notifications")]
     public class NotificationsController : ControllerBase

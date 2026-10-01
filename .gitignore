@@ -52,3 +52,7 @@ Desktop.ini
 # Local references & tokens
 reference-repo/
 token.txt
+
+# Browser regression output
+frontend/test-results/
+frontend/playwright-report/

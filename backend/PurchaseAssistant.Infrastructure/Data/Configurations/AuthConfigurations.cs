@@ -32,7 +32,12 @@ namespace PurchaseAssistant.Infrastructure.Data.Configurations
         {
             builder.HasKey(e => e.Id);
             builder.Property(e => e.TokenHash).IsRequired().HasMaxLength(255);
+            builder.Property(e => e.FamilyId).HasDefaultValueSql("gen_random_uuid()");
+            builder.Property(e => e.TokenDigest).HasMaxLength(64);
+            builder.Property(e => e.RevokedAt).IsConcurrencyToken();
             builder.HasIndex(e => e.UserId);
+            builder.HasIndex(e => new { e.UserId, e.TokenDigest }).IsUnique();
+            builder.HasIndex(e => new { e.UserId, e.FamilyId, e.RevokedAt });
         }
     }
 }

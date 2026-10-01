@@ -1,3 +1,4 @@
+import { formatMoney } from '../lib/formatMoney';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { dashboardApi } from '../api/dashboardApi';
@@ -138,7 +139,7 @@ export default function Dashboard() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Purchase Spend</p>
             <p className="text-2xl font-bold text-slate-900 mt-1">
-              ${pMetrics.totalPurchaseSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatMoney(pMetrics.totalPurchaseSpend)}
             </p>
             <p className="text-xs text-slate-400 mt-1">{pMetrics.completedPurchasesCount} completed orders</p>
           </div>
@@ -236,7 +237,7 @@ export default function Dashboard() {
                         </span>
                       </td>
                       <td className="py-3 px-4 text-right font-semibold text-slate-900">
-                        ${po.grandTotal.toFixed(2)}
+                        {formatMoney(po.grandTotal)}
                       </td>
                     </tr>
                   ))}

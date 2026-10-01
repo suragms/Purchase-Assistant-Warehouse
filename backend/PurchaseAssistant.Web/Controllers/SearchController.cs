@@ -8,19 +8,25 @@ namespace PurchaseAssistant.Web.Controllers
     [ApiController]
     [Route("api/v1/catalog/search")]
     [Authorize]
+    [Authorize(Policy = "RequireCatalogView")]
     public class SearchController : ControllerBase
     {
         private readonly IGlobalSearchService _searchService;
+        private readonly IAuthorizationService _authorization;
 
-        public SearchController(IGlobalSearchService searchService)
+        public SearchController(IGlobalSearchService searchService, IAuthorizationService authorization)
         {
             _searchService = searchService;
+            _authorization = authorization;
         }
 
         [HttpGet]
         public async Task<ActionResult<GlobalSearchResponseDto>> Search([FromQuery] string q, CancellationToken cancellationToken = default)
         {
-            return Ok(await _searchService.SearchAsync(q, cancellationToken));
+            var result = await _searchService.SearchAsync(q, cancellationToken);
+            if (!(await _authorization.AuthorizeAsync(User, "RequireSupplierView")).Succeeded) result.Suppliers.Clear();
+            if (!(await _authorization.AuthorizeAsync(User, "RequireBrokerView")).Succeeded) result.Brokers.Clear();
+            return Ok(result);
         }
     }
 }

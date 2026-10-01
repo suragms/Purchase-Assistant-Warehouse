@@ -1,3 +1,4 @@
+using PurchaseAssistant.Application.DTOs;
 using PurchaseAssistant.Application.DTOs.Purchase;
 using PurchaseAssistant.Domain.Enums;
 using System;
@@ -22,6 +23,7 @@ namespace PurchaseAssistant.Application.DTOs.Dashboard
         public int PendingPurchasesCount { get; set; }
         public int ActivePurchasesCount { get; set; }
         public int CompletedPurchasesCount { get; set; }
+        [FinancialField]
         public decimal TotalPurchaseSpend { get; set; }
     }
 
@@ -58,8 +60,11 @@ namespace PurchaseAssistant.Application.DTOs.Dashboard
         public string ItemCode { get; set; } = string.Empty;
         public string CatalogItemName { get; set; } = string.Empty;
         public string MovementType { get; set; } = string.Empty;
+        [OperationalNumeric]
         public decimal QuantityDelta { get; set; }
+        [OperationalNumeric]
         public decimal BeforeQuantity { get; set; }
+        [OperationalNumeric]
         public decimal AfterQuantity { get; set; }
         public string Reason { get; set; } = string.Empty;
         public DateTime Date { get; set; }

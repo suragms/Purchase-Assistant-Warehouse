@@ -1,3 +1,4 @@
+using PurchaseAssistant.Application.DTOs;
 using System;
 using System.Collections.Generic;
 
@@ -14,8 +15,11 @@ namespace PurchaseAssistant.Application.DTOs.Catalog
         public Guid? TypeId { get; set; }
         public string? TypeName { get; set; }
         public string DefaultUnit { get; set; } = "PCS";
+        [OperationalNumeric]
         public decimal? KgPerUnit { get; set; }
+        [OperationalNumeric]
         public decimal ReorderLevel { get; set; }
+        [OperationalNumeric]
         public decimal CurrentStock { get; set; }
         public bool IsActive { get; set; }
         public Guid RowVersion { get; set; }
@@ -39,6 +43,9 @@ namespace PurchaseAssistant.Application.DTOs.Catalog
         public string? Barcode { get; set; }
         public string? AttributesJson { get; set; }
         public bool IsActive { get; set; }
+        [OperationalNumeric]
+        public decimal? KgPerUnit { get; set; }
+        public Guid RowVersion { get; set; }
     }
 
     public class SupplierSummaryDto

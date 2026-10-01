@@ -1,3 +1,4 @@
+import { formatMoney } from '../../lib/formatMoney';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { purchaseApi, PurchaseStatus, DeliveryState } from '../../api/purchaseApi';
@@ -27,7 +28,7 @@ export default function PurchaseDashboard() {
 
   const totalSpend = orders
     .filter(o => o.status !== PurchaseStatus.Cancelled)
-    .reduce((sum, o) => sum + o.grandTotal, 0);
+    .reduce((sum, o) => sum + (o.grandTotal ?? 0), 0);
 
   const recentOrders = [...orders]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -97,7 +98,7 @@ export default function PurchaseDashboard() {
         <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Purchase Value</p>
-            <p className="text-2xl font-bold text-emerald-600 mt-1">${totalSpend.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-emerald-600 mt-1">{orders.some(o => o.grandTotal == null) ? 'Owner only' : formatMoney(totalSpend)}</p>
           </div>
           <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600">
             <DollarSign className="w-6 h-6" />
@@ -151,7 +152,7 @@ export default function PurchaseDashboard() {
                       {Object.keys(DeliveryState).find(key => DeliveryState[key as keyof typeof DeliveryState] === po.deliveryState)}
                     </td>
                     <td className="py-3 px-4 text-right font-semibold text-slate-900">
-                      ${po.grandTotal.toFixed(2)}
+                      {formatMoney(po.grandTotal)}
                     </td>
                     <td className="py-3 px-4 text-right">
                       <button

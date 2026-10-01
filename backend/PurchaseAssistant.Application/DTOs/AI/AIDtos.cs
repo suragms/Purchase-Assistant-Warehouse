@@ -1,3 +1,4 @@
+using PurchaseAssistant.Application.DTOs;
 using System.Text.Json.Serialization;
 
 namespace PurchaseAssistant.Application.DTOs.AI;
@@ -14,7 +15,7 @@ public record AIResponse(
     string? Error,
     string Provider,
     string ModelUsed,
-    decimal LatencyMs
+    [property: OperationalNumeric] decimal LatencyMs
 );
 
 [JsonConverter(typeof(JsonStringEnumConverter))]

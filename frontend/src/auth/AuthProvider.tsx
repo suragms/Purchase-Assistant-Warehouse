@@ -1,27 +1,43 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import apiClient from '../api/apiClient';
 import { Loader2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import type { User, AuthResponse } from '../types/auth';
+
+const sessionScope = (user: User | null) => JSON.stringify([user?.id, user?.currentBusiness?.businessId,
+  user?.currentBusiness?.role, [...(user?.currentBusiness?.permissions || [])].sort()]);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const setSession = useAuthStore((s) => s.setSession);
   const logout = useAuthStore((s) => s.logout);
+  const queryClient = useQueryClient();
+  const user = useAuthStore(s => s.user);
+  const refreshRequest = useRef<Promise<{ data: AuthResponse }> | null>(null);
+
+  // Clear prior data synchronously before a changed identity/tenant/permission scope renders.
+  useEffect(() => useAuthStore.subscribe((next, previous) => {
+    if (sessionScope(next.user) !== sessionScope(previous.user)) queryClient.clear();
+  }), [queryClient]);
 
   useEffect(() => {
+    let active = true;
     const initAuth = async () => {
       try {
-        const { data } = await apiClient.post('/auth/refresh');
-        if (data?.data) {
+        refreshRequest.current ??= apiClient.post<AuthResponse>('/auth/refresh');
+        const { data } = await refreshRequest.current;
+        if (active && data?.data) {
           setSession(data.data.accessToken, data.data.user);
         }
       } catch (err) {
-        logout();
+        if (active) logout();
       } finally {
-        setIsLoading(false);
+        if (active) setIsLoading(false);
       }
     };
     initAuth();
+    return () => { active = false; };
   }, [setSession, logout]);
 
   if (isLoading) {
@@ -32,5 +48,5 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   }
 
-  return <>{children}</>;
+  return <React.Fragment key={sessionScope(user)}>{children}</React.Fragment>;
 };

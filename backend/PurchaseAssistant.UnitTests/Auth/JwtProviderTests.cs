@@ -37,7 +37,7 @@ public class JwtProviderTests
         };
 
         // Act
-        var token = _sut.GenerateAccessToken(user, null);
+        var token = _sut.GenerateAccessToken(user, null, Guid.NewGuid());
 
         // Assert
         token.Should().NotBeNullOrEmpty();
@@ -73,7 +73,7 @@ public class JwtProviderTests
         };
 
         // Act
-        var token = _sut.GenerateAccessToken(user, membership);
+        var token = _sut.GenerateAccessToken(user, membership, Guid.NewGuid());
 
         // Assert
         token.Should().NotBeNullOrEmpty();

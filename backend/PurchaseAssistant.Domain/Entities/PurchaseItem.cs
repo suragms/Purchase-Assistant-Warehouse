@@ -13,6 +13,10 @@ namespace PurchaseAssistant.Domain.Entities
         public decimal OrderedQuantity { get; set; }
         public decimal ReceivedQuantity { get; set; }
         public decimal UnitPrice { get; set; }
+        public decimal DiscountPercent { get; set; }
+        public decimal TaxPercent { get; set; }
+        public decimal? KgPerUnit { get; set; }
+        public decimal? LandingCostPerKg { get; set; }
         public decimal LineTotal { get; set; }
         public string? Notes { get; set; }
     }

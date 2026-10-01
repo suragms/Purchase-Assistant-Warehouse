@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace PurchaseAssistant.Web.Controllers
 {
-    [Authorize]
+    [Authorize(Policy = "RequireSelectedBusiness")]
     [ApiController]
     [Route("api/v1/dashboard")]
     public class DashboardController : ControllerBase

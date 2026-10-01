@@ -1,3 +1,4 @@
+using PurchaseAssistant.Application.DTOs;
 using System;
 
 namespace PurchaseAssistant.Application.DTOs.Stock
@@ -11,10 +12,15 @@ namespace PurchaseAssistant.Application.DTOs.Stock
         public string CategoryName { get; set; } = string.Empty;
         public string DefaultUnit { get; set; } = string.Empty;
 
+        [OperationalNumeric]
         public decimal SystemStock { get; set; }
+        [OperationalNumeric]
         public decimal PhysicalStock { get; set; }
+        [OperationalNumeric]
         public decimal ReservedStock { get; set; }
+        [OperationalNumeric]
         public decimal AvailableStock { get; set; }
+        [OperationalNumeric]
         public decimal ReorderLevel { get; set; }
 
         public bool IsActive { get; set; }
@@ -26,8 +32,11 @@ namespace PurchaseAssistant.Application.DTOs.Stock
         public Guid Id { get; set; }
         public Guid CatalogItemId { get; set; }
         public string MovementType { get; set; } = string.Empty;
+        [OperationalNumeric]
         public decimal QuantityDelta { get; set; }
+        [OperationalNumeric]
         public decimal QuantityBefore { get; set; }
+        [OperationalNumeric]
         public decimal QuantityAfter { get; set; }
         public string? ReferenceType { get; set; }
         public string? ReferenceId { get; set; }
@@ -40,6 +49,12 @@ namespace PurchaseAssistant.Application.DTOs.Stock
 
     public class AdjustStockRequestDto
     {
+        // Internal workflow provenance; API callers cannot supply ledger references.
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string? ReferenceType { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string? ReferenceId { get; set; }
+        [OperationalNumeric]
         public decimal QuantityDelta { get; set; }
         public string? Reason { get; set; }
         public string? Notes { get; set; }
@@ -48,6 +63,7 @@ namespace PurchaseAssistant.Application.DTOs.Stock
 
     public class UpdatePhysicalStockRequestDto
     {
+        [OperationalNumeric]
         public decimal PhysicalStock { get; set; }
         public string? Reason { get; set; }
         public string? Notes { get; set; }

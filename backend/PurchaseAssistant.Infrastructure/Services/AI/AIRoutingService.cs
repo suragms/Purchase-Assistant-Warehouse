@@ -37,6 +37,7 @@ public class AIRoutingService : IAIRoutingService
 
         foreach (var providerType in _failoverOrder)
         {
+            ct.ThrowIfCancellationRequested();
             try
             {
                 var provider = _providerFactory.GetProvider(providerType);
@@ -48,15 +49,16 @@ public class AIRoutingService : IAIRoutingService
                     return response;
                 }
 
-                _logger.LogWarning("AI Request failed using {Provider}: {Error}", providerType, response.Error);
+                _logger.LogWarning("AI Request failed using {Provider}", providerType);
             }
             catch (NotSupportedException)
             {
                 _logger.LogInformation("Provider {Provider} not configured, skipping.", providerType);
             }
-            catch (Exception ex)
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+            catch (Exception)
             {
-                _logger.LogError(ex, "Provider {Provider} threw an exception", providerType);
+                _logger.LogWarning("Provider {Provider} unavailable", providerType);
             }
         }
 

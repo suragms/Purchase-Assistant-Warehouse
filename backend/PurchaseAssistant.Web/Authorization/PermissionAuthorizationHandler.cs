@@ -19,7 +19,7 @@ namespace PurchaseAssistant.Web.Authorization
     {
         protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, PermissionRequirement requirement)
         {
-            if (context.User == null)
+            if (context.User.Identity?.IsAuthenticated != true)
             {
                 return Task.CompletedTask;
             }

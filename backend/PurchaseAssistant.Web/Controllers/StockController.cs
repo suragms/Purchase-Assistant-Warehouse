@@ -61,6 +61,10 @@ namespace PurchaseAssistant.Web.Controllers
                 var result = await _stockService.GetStockDetailAsync(id);
                 return Ok(result);
             }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
             catch (KeyNotFoundException)
             {
                 return NotFound(new { error = "STOCK_ITEM_NOT_FOUND" });
@@ -79,6 +83,10 @@ namespace PurchaseAssistant.Web.Controllers
                 var result = await _stockService.GetItemActivityAsync(id, page, pageSize);
                 return Ok(result);
             }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
             catch (KeyNotFoundException)
             {
                 return NotFound(new { error = "STOCK_ITEM_NOT_FOUND" });
@@ -93,6 +101,10 @@ namespace PurchaseAssistant.Web.Controllers
             {
                 var result = await _stockService.AdjustStockAsync(id, request);
                 return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { error = ex.Message });
             }
             catch (KeyNotFoundException)
             {
@@ -117,6 +129,10 @@ namespace PurchaseAssistant.Web.Controllers
                 var result = await _stockService.UpdatePhysicalStockAsync(id, request);
                 return Ok(result);
             }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
             catch (KeyNotFoundException)
             {
                 return NotFound(new { error = "STOCK_ITEM_NOT_FOUND" });
@@ -135,6 +151,10 @@ namespace PurchaseAssistant.Web.Controllers
             {
                 var result = await _stockService.ReconcileStockAsync(id, request);
                 return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { error = ex.Message });
             }
             catch (KeyNotFoundException)
             {

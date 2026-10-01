@@ -21,28 +21,20 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<List<BrokerDto>> GetAllAsync(CancellationToken cancellationToken = default)
         {
-            var brokers = await _context.Brokers
+            return await _context.Brokers.AsNoTracking()
                 .OrderBy(b => b.Name)
-                .ToListAsync(cancellationToken);
-
-            var result = new List<BrokerDto>();
-            foreach (var brk in brokers)
-            {
-                var count = await _context.BrokerSuppliers.CountAsync(bs => bs.BrokerId == brk.Id, cancellationToken);
-                result.Add(new BrokerDto
+                .Select(brk => new BrokerDto
                 {
                     Id = brk.Id,
                     Name = brk.Name,
                     IsActive = brk.IsActive,
-                    LinkedSuppliersCount = count
-                });
-            }
-            return result;
+                    LinkedSuppliersCount = _context.BrokerSuppliers.Count(bs => bs.BrokerId == brk.Id)
+                }).ToListAsync(cancellationToken);
         }
 
         public async Task<BrokerDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         {
-            var brk = await _context.Brokers.FindAsync(new object[] { id }, cancellationToken);
+            var brk = await _context.Brokers.FirstOrDefaultAsync(x => x.Id == id && x.BusinessId == _currentUser.BusinessId, cancellationToken);
             if (brk == null) return null;
 
             var count = await _context.BrokerSuppliers.CountAsync(bs => bs.BrokerId == brk.Id, cancellationToken);
@@ -90,7 +82,7 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<BrokerDto> UpdateAsync(Guid id, BrokerDto dto, CancellationToken cancellationToken = default)
         {
-            var broker = await _context.Brokers.FindAsync(new object[] { id }, cancellationToken);
+            var broker = await _context.Brokers.FirstOrDefaultAsync(x => x.Id == id && x.BusinessId == _currentUser.BusinessId, cancellationToken);
             if (broker == null) throw new KeyNotFoundException("BROKER_NOT_FOUND");
 
             broker.Name = dto.Name.Trim();
@@ -111,7 +103,7 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
         {
-            var broker = await _context.Brokers.FindAsync(new object[] { id }, cancellationToken);
+            var broker = await _context.Brokers.FirstOrDefaultAsync(x => x.Id == id && x.BusinessId == _currentUser.BusinessId, cancellationToken);
             if (broker == null) throw new KeyNotFoundException("BROKER_NOT_FOUND");
 
             var hasSuppliers = await _context.BrokerSuppliers.AnyAsync(bs => bs.BrokerId == id, cancellationToken);

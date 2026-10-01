@@ -21,26 +21,17 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<List<CategoryTypeDto>> GetByCategoryIdAsync(Guid categoryId, CancellationToken cancellationToken = default)
         {
-            var types = await _context.CategoryTypes
-                .Include(t => t.Category)
+            return await _context.CategoryTypes.AsNoTracking()
                 .Where(t => t.CategoryId == categoryId)
                 .OrderBy(t => t.Name)
-                .ToListAsync(cancellationToken);
-
-            var result = new List<CategoryTypeDto>();
-            foreach (var type in types)
-            {
-                var count = await _context.CatalogItems.CountAsync(i => i.TypeId == type.Id, cancellationToken);
-                result.Add(new CategoryTypeDto
+                .Select(type => new CategoryTypeDto
                 {
                     Id = type.Id,
                     CategoryId = type.CategoryId,
                     CategoryName = type.Category.Name,
                     Name = type.Name,
-                    ItemCount = count
-                });
-            }
-            return result;
+                    ItemCount = _context.CatalogItems.Count(i => i.TypeId == type.Id)
+                }).ToListAsync(cancellationToken);
         }
 
         public async Task<CategoryTypeDto> CreateAsync(Guid categoryId, string name, CancellationToken cancellationToken = default)
@@ -57,7 +48,7 @@ namespace PurchaseAssistant.Infrastructure.Services
                 throw new InvalidOperationException("CATEGORY_TYPE_EXISTS");
             }
 
-            var category = await _context.Categories.FindAsync(new object[] { categoryId }, cancellationToken);
+            var category = await _context.Categories.FirstOrDefaultAsync(c => c.Id == categoryId && c.BusinessId == businessId, cancellationToken);
             if (category == null) throw new KeyNotFoundException("CATEGORY_NOT_FOUND");
 
             var type = new CategoryType
@@ -106,7 +97,7 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
         {
-            var type = await _context.CategoryTypes.FindAsync(new object[] { id }, cancellationToken);
+            var type = await _context.CategoryTypes.FirstOrDefaultAsync(t => t.Id == id && t.BusinessId == _currentUser.BusinessId, cancellationToken);
             if (type == null) throw new KeyNotFoundException("CATEGORY_TYPE_NOT_FOUND");
 
             var hasItems = await _context.CatalogItems.AnyAsync(i => i.TypeId == id, cancellationToken);

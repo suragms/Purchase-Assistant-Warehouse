@@ -13,12 +13,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Text.Json;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace PurchaseAssistant.Web.Controllers
 {
     [ApiController]
     [Route("api/v1/[controller]")]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth")]
     public class AuthController : ControllerBase
     {
         private readonly AppDbContext _db;
@@ -61,7 +64,6 @@ namespace PurchaseAssistant.Web.Controllers
             }
 
             var activeMembership = user.Memberships.FirstOrDefault(m => m.Business.IsActive);
-            var token = _jwtProvider.GenerateAccessToken(user, activeMembership);
             var refreshTokenString = _jwtProvider.GenerateRandomToken();
             var refreshTokenHash = _passwordHasher.HashPassword(refreshTokenString);
 
@@ -69,6 +71,7 @@ namespace PurchaseAssistant.Web.Controllers
             {
                 UserId = user.Id,
                 TokenHash = refreshTokenHash,
+                TokenDigest = Digest(refreshTokenString),
                 ExpiresAt = DateTime.UtcNow.AddDays(7),
                 CreatedByIp = HttpContext.Connection.RemoteIpAddress?.ToString(),
                 UserAgent = Request.Headers.UserAgent.ToString()
@@ -76,8 +79,9 @@ namespace PurchaseAssistant.Web.Controllers
 
             _db.RefreshTokens.Add(rt);
             await _db.SaveChangesAsync();
+            var token = _jwtProvider.GenerateAccessToken(user, activeMembership, rt.FamilyId);
 
-            SetRefreshTokenCookie($"{user.Id}:{refreshTokenString}");
+            SetRefreshTokenCookie($"{user.Id}:{refreshTokenString}:{activeMembership?.BusinessId}");
             await LogSecurityEvent(activeMembership?.BusinessId, user.Id, "LOGIN_SUCCESS", $"User {user.Email} logged in successfully");
 
             var permissions = new List<string>();
@@ -124,29 +128,27 @@ namespace PurchaseAssistant.Web.Controllers
                 return Unauthorized(new { error = new { code = "AUTH_REQUIRED", message = "Refresh token is missing." } });
             }
 
-            var parts = cookie.Split(':', 2);
-            if (parts.Length != 2 || !Guid.TryParse(parts[0], out var userId))
+            var parts = cookie.Split(':', 3);
+            if (parts.Length < 2 || !Guid.TryParse(parts[0], out var userId))
             {
                 return Unauthorized(new { error = new { code = "INVALID_TOKEN", message = "Malformed refresh cookie." } });
             }
 
             var tokenRaw = parts[1];
-            var activeTokens = await _db.RefreshTokens
-                .Where(t => t.UserId == userId && t.RevokedAt == null && t.ExpiresAt > DateTime.UtcNow)
-                .ToListAsync();
-
-            var matched = activeTokens.FirstOrDefault(t => _passwordHasher.VerifyPassword(tokenRaw, t.TokenHash));
-            if (matched == null)
+            var matched = await FindRefreshTokenAsync(userId, tokenRaw);
+            if (matched == null || matched.ExpiresAt <= DateTime.UtcNow)
+                return Unauthorized(new { error = new { code = "INVALID_TOKEN", message = "Refresh token is invalid." } });
+            if (matched.RevokedAt != null)
             {
-                // Suspected token reuse or invalid token: revoke all tokens for this user family as security measure
-                var staleTokens = await _db.RefreshTokens.Where(t => t.UserId == userId && t.RevokedAt == null).ToListAsync();
+                // A verified replay revokes only its session family; arbitrary cookies cannot revoke sessions.
+                var staleTokens = await _db.RefreshTokens.Where(t => t.UserId == userId && t.FamilyId == matched.FamilyId && t.RevokedAt == null).ToListAsync();
                 foreach (var t in staleTokens)
                 {
                     t.RevokedAt = DateTime.UtcNow;
                     t.RevokedByIp = HttpContext.Connection.RemoteIpAddress?.ToString();
                 }
                 await _db.SaveChangesAsync();
-                await LogSecurityEvent(null, userId, "REFRESH_TOKEN_REUSE_DETECTED", "Revoked all active sessions due to invalid/reused token presentation.");
+                await LogSecurityEvent(null, userId, "REFRESH_TOKEN_REUSE_DETECTED", "Revoked the session family due to verified token reuse.");
 
                 return Unauthorized(new { error = new { code = "REFRESH_TOKEN_REUSE", message = "Security violation: session invalidated." } });
             }
@@ -164,15 +166,22 @@ namespace PurchaseAssistant.Web.Controllers
                 return StatusCode(StatusCodes.Status403Forbidden, new { error = new { code = "ACCOUNT_INACTIVE", message = "Account is inactive or blocked." } });
             }
 
-            var activeMembership = user.Memberships.FirstOrDefault(m => m.Business.IsActive);
-            var newAccessToken = _jwtProvider.GenerateAccessToken(user, activeMembership);
+            var selectedBusiness = parts.Length == 3 && Guid.TryParse(parts[2], out var selectedId) ? (Guid?)selectedId : null;
+            var activeMembership = selectedBusiness.HasValue
+                ? user.Memberships.FirstOrDefault(m => m.BusinessId == selectedBusiness && m.Business.IsActive)
+                : user.Memberships.FirstOrDefault(m => m.Business.IsActive);
+            if (selectedBusiness.HasValue && activeMembership == null)
+                return StatusCode(403, new { error = new { code = "BUSINESS_ACCESS_DENIED", message = "This business membership is no longer active." } });
+            var newAccessToken = _jwtProvider.GenerateAccessToken(user, activeMembership, matched.FamilyId);
             var newRfString = _jwtProvider.GenerateRandomToken();
             var newRfHash = _passwordHasher.HashPassword(newRfString);
 
             var newRf = new RefreshToken
             {
                 UserId = user.Id,
+                FamilyId = matched.FamilyId,
                 TokenHash = newRfHash,
+                TokenDigest = Digest(newRfString),
                 ExpiresAt = DateTime.UtcNow.AddDays(7),
                 CreatedByIp = HttpContext.Connection.RemoteIpAddress?.ToString(),
                 UserAgent = Request.Headers.UserAgent.ToString(),
@@ -180,9 +189,13 @@ namespace PurchaseAssistant.Web.Controllers
             };
 
             _db.RefreshTokens.Add(newRf);
-            await _db.SaveChangesAsync();
+            try { await _db.SaveChangesAsync(); }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Conflict(new { error = new { code = "REFRESH_CONFLICT", message = "This session was already refreshed. Retry using the current session." } });
+            }
 
-            SetRefreshTokenCookie($"{user.Id}:{newRfString}");
+            SetRefreshTokenCookie($"{user.Id}:{newRfString}:{activeMembership?.BusinessId}");
 
             var permissions = new List<string>();
             if (activeMembership != null && !string.IsNullOrEmpty(activeMembership.PermissionsJson))
@@ -281,7 +294,10 @@ namespace PurchaseAssistant.Web.Controllers
                 return StatusCode(StatusCodes.Status403Forbidden, new { error = new { code = "BUSINESS_ACCESS_DENIED", message = "You do not belong to this business." } });
             }
 
-            var newAccessToken = _jwtProvider.GenerateAccessToken(user, targetMembership);
+            var refreshCookie = Request.Cookies["refreshToken"]?.Split(':', 3);
+            if (refreshCookie?.Length >= 2 && Guid.TryParse(refreshCookie[0], out var cookieUserId) && cookieUserId == user.Id)
+                SetRefreshTokenCookie($"{user.Id}:{refreshCookie[1]}:{targetMembership.BusinessId}");
+            var newAccessToken = _jwtProvider.GenerateAccessToken(user, targetMembership, Guid.Parse(User.FindFirstValue("sessionId")!));
             await LogSecurityEvent(targetMembership.BusinessId, user.Id, "BUSINESS_SWITCHED", $"User switched active context to business {targetMembership.Business.Name}");
 
             var permissions = new List<string>();
@@ -320,21 +336,16 @@ namespace PurchaseAssistant.Web.Controllers
         [Authorize]
         public async Task<IActionResult> Logout()
         {
-            var cookie = Request.Cookies["refreshToken"];
-            if (!string.IsNullOrEmpty(cookie))
+            if (_currentUser.UserId.HasValue && Guid.TryParse(User.FindFirstValue("sessionId"), out var sessionId))
             {
-                var parts = cookie.Split(':', 2);
-                if (parts.Length == 2 && Guid.TryParse(parts[0], out var userId))
+                var tokens = await _db.RefreshTokens.Where(t => t.UserId == _currentUser.UserId.Value
+                    && t.FamilyId == sessionId && t.RevokedAt == null).ToListAsync();
+                foreach (var token in tokens)
                 {
-                    var tokens = await _db.RefreshTokens.Where(t => t.UserId == userId && t.RevokedAt == null).ToListAsync();
-                    var matched = tokens.FirstOrDefault(t => _passwordHasher.VerifyPassword(parts[1], t.TokenHash));
-                    if (matched != null)
-                    {
-                        matched.RevokedAt = DateTime.UtcNow;
-                        matched.RevokedByIp = HttpContext.Connection.RemoteIpAddress?.ToString();
-                        await _db.SaveChangesAsync();
-                    }
+                    token.RevokedAt = DateTime.UtcNow;
+                    token.RevokedByIp = HttpContext.Connection.RemoteIpAddress?.ToString();
                 }
+                await _db.SaveChangesAsync();
             }
 
             Response.Cookies.Delete("refreshToken");
@@ -370,47 +381,20 @@ namespace PurchaseAssistant.Web.Controllers
 
         [HttpPost("forgot-password")]
         [AllowAnonymous]
-        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        public IActionResult ForgotPassword([FromBody] ForgotPasswordRequest request)
         {
-            var user = await _db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == request.Email.Trim().ToLowerInvariant());
-            if (user != null)
-            {
-                await LogSecurityEvent(null, user.Id, "PASSWORD_RESET_REQUESTED", "Password reset instructions generated.");
-            }
-            // Always return identical generic message to prevent email enumeration
-            return Ok(new ApiResponse<string>("If the account exists, password reset instructions have been sent."));
+            // No token issuer or delivery service exists. Never claim that instructions were sent.
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = new {
+                code = "PASSWORD_RESET_UNAVAILABLE", message = "Password reset is not configured. Contact your business owner for help." } });
         }
 
         [HttpPost("reset-password")]
         [AllowAnonymous]
-        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+        public IActionResult ResetPassword([FromBody] ResetPasswordRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8)
-            {
-                return BadRequest(new { error = new { code = "VALIDATION_ERROR", message = "Password must be at least 8 characters long." } });
-            }
-
-            // In production, validate cryptographically signed token. Here, handle token validation:
-            var user = await _db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == request.Email.Trim().ToLowerInvariant());
-            if (user == null)
-            {
-                return BadRequest(new { error = new { code = "INVALID_RESET_TOKEN", message = "Invalid or expired reset token." } });
-            }
-
-            user.PasswordHash = _passwordHasher.HashPassword(request.NewPassword);
-            user.UpdatedAt = DateTime.UtcNow;
-
-            // Revoke all existing sessions
-            var tokens = await _db.RefreshTokens.Where(t => t.UserId == user.Id && t.RevokedAt == null).ToListAsync();
-            foreach (var t in tokens)
-            {
-                t.RevokedAt = DateTime.UtcNow;
-            }
-
-            await _db.SaveChangesAsync();
-            await LogSecurityEvent(null, user.Id, "PASSWORD_RESET_SUCCESS", "Password reset successfully completed. All sessions revoked.");
-
-            return Ok(new ApiResponse<string>("Password has been reset successfully. Please sign in."));
+            // Fail closed until signed, expiring, single-use tokens and secure delivery are implemented together.
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = new {
+                code = "PASSWORD_RESET_UNAVAILABLE", message = "Password reset is not configured. Contact your business owner for help." } });
         }
 
         private void SetRefreshTokenCookie(string tokenValue)
@@ -425,6 +409,20 @@ namespace PurchaseAssistant.Web.Controllers
                 Path = "/"
             };
             Response.Cookies.Append("refreshToken", tokenValue, cookieOptions);
+        }
+
+        private static string Digest(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+
+        private async Task<RefreshToken?> FindRefreshTokenAsync(Guid userId, string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw) || raw.Length > 256) return null;
+            var digest = Digest(raw);
+            var indexed = await _db.RefreshTokens.SingleOrDefaultAsync(t => t.UserId == userId && t.TokenDigest == digest);
+            if (indexed != null) return indexed;
+            // Bounded compatibility for existing BCrypt-only cookies. New tokens always use indexed digests.
+            var legacy = await _db.RefreshTokens.Where(t => t.UserId == userId && t.TokenDigest == null && t.ExpiresAt > DateTime.UtcNow)
+                .OrderByDescending(t => t.CreatedAt).ThenByDescending(t => t.Id).Take(100).ToListAsync();
+            return legacy.FirstOrDefault(t => _passwordHasher.VerifyPassword(raw, t.TokenHash));
         }
 
         private async Task LogSecurityEvent(Guid? businessId, Guid? userId, string eventType, string desc)

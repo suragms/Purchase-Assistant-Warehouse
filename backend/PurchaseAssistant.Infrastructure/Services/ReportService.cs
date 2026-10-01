@@ -18,11 +18,21 @@ namespace PurchaseAssistant.Infrastructure.Services
             _context = context;
         }
 
+        private static void ValidatePeriod(ref DateTime startDate, ref DateTime endDate)
+        {
+            startDate = startDate.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(startDate, DateTimeKind.Utc) : startDate.ToUniversalTime();
+            endDate = endDate.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(endDate, DateTimeKind.Utc) : endDate.ToUniversalTime();
+            if (endDate <= startDate || (endDate - startDate).TotalDays > 3660 || startDate < DateTime.MinValue.AddDays(3660))
+                throw new ArgumentException("Choose an end date after the start date, with a reporting period of at most ten years.");
+        }
+
         public async Task<List<SpendAnalyticsDto>> GetSpendAnalyticsAsync(Guid businessId, DateTime startDate, DateTime endDate, string groupBy = "day")
         {
+            ValidatePeriod(ref startDate, ref endDate);
+            if (groupBy is not ("day" or "month")) throw new ArgumentException("Choose day or month for spend grouping.");
             var query = _context.Purchases
                 .AsNoTracking()
-                .Where(p => p.BusinessId == businessId && p.CreatedAt >= startDate && p.CreatedAt <= endDate && p.Status != Domain.Enums.PurchaseStatus.Cancelled);
+                .Where(p => p.BusinessId == businessId && p.CreatedAt >= startDate && p.CreatedAt <= endDate && p.Status != Domain.Enums.PurchaseStatus.Cancelled && p.Status != Domain.Enums.PurchaseStatus.Draft);
 
             var rawData = await query
                 .Select(p => new { p.CreatedAt, p.GrandTotal })
@@ -57,9 +67,10 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<PurchaseSummaryReportDto> GetPurchaseSummaryAsync(Guid businessId, DateTime startDate, DateTime endDate)
         {
+            ValidatePeriod(ref startDate, ref endDate);
             var purchasesQuery = _context.Purchases
                 .AsNoTracking()
-                .Where(p => p.BusinessId == businessId && p.CreatedAt >= startDate && p.CreatedAt <= endDate && p.Status != Domain.Enums.PurchaseStatus.Cancelled);
+                .Where(p => p.BusinessId == businessId && p.CreatedAt >= startDate && p.CreatedAt <= endDate && p.Status != Domain.Enums.PurchaseStatus.Cancelled && p.Status != Domain.Enums.PurchaseStatus.Draft);
 
             // By Supplier
             var bySupplier = await purchasesQuery
@@ -89,7 +100,7 @@ namespace PurchaseAssistant.Infrastructure.Services
             // By Category (via PurchaseItems -> CatalogItem -> Category)
             var itemsQuery = _context.PurchaseItems
                 .AsNoTracking()
-                .Where(pi => pi.BusinessId == businessId && pi.PurchaseOrder.CreatedAt >= startDate && pi.PurchaseOrder.CreatedAt <= endDate && pi.PurchaseOrder.Status != Domain.Enums.PurchaseStatus.Cancelled);
+                .Where(pi => pi.BusinessId == businessId && pi.PurchaseOrder.CreatedAt >= startDate && pi.PurchaseOrder.CreatedAt <= endDate && pi.PurchaseOrder.Status != Domain.Enums.PurchaseStatus.Cancelled && pi.PurchaseOrder.Status != Domain.Enums.PurchaseStatus.Draft);
 
             var byCategoryRaw = await itemsQuery
                 .Include(pi => pi.CatalogItem)
@@ -122,12 +133,22 @@ namespace PurchaseAssistant.Infrastructure.Services
                 .Where(i => i.BusinessId == businessId);
 
             var totalItems = await itemsQuery.CountAsync();
-            var lowStockCount = await itemsQuery.Where(i => i.CurrentStock <= i.ReorderLevel && i.CurrentStock > 0).CountAsync();
-            var outOfStockCount = await itemsQuery.Where(i => i.CurrentStock <= 0).CountAsync();
+            var lowStockCount = await itemsQuery.Where(i => i.CurrentStock - i.ReservedStock <= i.ReorderLevel && i.CurrentStock - i.ReservedStock > 0).CountAsync();
+            var outOfStockCount = await itemsQuery.Where(i => i.CurrentStock - i.ReservedStock <= 0).CountAsync();
 
-            // Estimated inventory value based on current stock * unit price (if available via SupplierItemPrice or default)
-            var inventoryValue = await itemsQuery
-                .SumAsync(i => i.CurrentStock * 10.0m); // fallback estimation or 0 if unit price not directly on CatalogItem
+            // Value only priced stock using the latest confirmed purchase cost. Never invent a fallback rate.
+            var inventoryValue = await itemsQuery.Select(i => i.CurrentStock *
+                (_context.PurchaseItems.Where(pi => pi.CatalogItemId == i.Id && pi.BusinessId == businessId
+                    && pi.PurchaseOrder.Status != Domain.Enums.PurchaseStatus.Draft
+                    && pi.PurchaseOrder.Status != Domain.Enums.PurchaseStatus.Cancelled)
+                    .OrderByDescending(pi => pi.PurchaseOrder.ConfirmedAt ?? pi.PurchaseOrder.CreatedAt)
+                    .ThenByDescending(pi => pi.Id)
+                    .Select(pi => (decimal?)(pi.LineTotal / pi.OrderedQuantity)).FirstOrDefault() ?? 0m)).SumAsync();
+
+            var unpricedCount = await itemsQuery.CountAsync(i => i.CurrentStock > 0 && !_context.PurchaseItems.Any(pi =>
+                pi.CatalogItemId == i.Id && pi.BusinessId == businessId
+                && pi.PurchaseOrder.Status != Domain.Enums.PurchaseStatus.Draft
+                && pi.PurchaseOrder.Status != Domain.Enums.PurchaseStatus.Cancelled));
 
             var movementsCount = await _context.StockMovements
                 .AsNoTracking()
@@ -140,12 +161,14 @@ namespace PurchaseAssistant.Infrastructure.Services
                 LowStockCount = lowStockCount,
                 OutOfStockCount = outOfStockCount,
                 EstimatedInventoryValue = inventoryValue,
+                UnpricedStockItemCount = unpricedCount,
                 TotalMovementsCount = movementsCount
             };
         }
 
         public async Task<PeriodComparisonDto> GetPeriodComparisonAsync(Guid businessId, DateTime startDate, DateTime endDate)
         {
+            ValidatePeriod(ref startDate, ref endDate);
             var span = endDate - startDate;
             var prevEndDate = startDate;
             var prevStartDate = startDate - span;
@@ -153,7 +176,7 @@ namespace PurchaseAssistant.Infrastructure.Services
             // Current Period
             var currentPurchases = await _context.Purchases
                 .AsNoTracking()
-                .Where(p => p.BusinessId == businessId && p.CreatedAt >= startDate && p.CreatedAt <= endDate && p.Status != Domain.Enums.PurchaseStatus.Cancelled)
+                .Where(p => p.BusinessId == businessId && p.CreatedAt >= startDate && p.CreatedAt <= endDate && p.Status != Domain.Enums.PurchaseStatus.Cancelled && p.Status != Domain.Enums.PurchaseStatus.Draft)
                 .ToListAsync();
 
             var currentSpend = currentPurchases.Sum(p => p.GrandTotal);
@@ -163,7 +186,7 @@ namespace PurchaseAssistant.Infrastructure.Services
             // Previous Period
             var prevPurchases = await _context.Purchases
                 .AsNoTracking()
-                .Where(p => p.BusinessId == businessId && p.CreatedAt >= prevStartDate && p.CreatedAt < prevEndDate && p.Status != Domain.Enums.PurchaseStatus.Cancelled)
+                .Where(p => p.BusinessId == businessId && p.CreatedAt >= prevStartDate && p.CreatedAt < prevEndDate && p.Status != Domain.Enums.PurchaseStatus.Cancelled && p.Status != Domain.Enums.PurchaseStatus.Draft)
                 .ToListAsync();
 
             var prevSpend = prevPurchases.Sum(p => p.GrandTotal);

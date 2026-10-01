@@ -19,6 +19,7 @@ namespace PurchaseAssistant.IntegrationTests.Dashboard
         private IDashboardService _service = null!;
         private Guid _businessId;
         private Guid _userId;
+        private Guid? _otherBusinessId;
         private class StubTenant : ITenantProvider { public Guid BId; public Guid GetBusinessId() => BId; }
         private StubTenant _tenant = null!;
 
@@ -47,6 +48,12 @@ namespace PurchaseAssistant.IntegrationTests.Dashboard
 
         public async Task DisposeAsync()
         {
+            if (_otherBusinessId.HasValue)
+            {
+                await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"CatalogItems\" WHERE \"BusinessId\" = {0}", _otherBusinessId.Value);
+                await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"Categories\" WHERE \"BusinessId\" = {0}", _otherBusinessId.Value);
+                await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"Businesses\" WHERE \"Id\" = {0}", _otherBusinessId.Value);
+            }
             await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"PurchaseItems\" WHERE \"BusinessId\" = {0}", _businessId);
             await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"Purchases\" WHERE \"BusinessId\" = {0}", _businessId);
             await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"CatalogItems\" WHERE \"BusinessId\" = {0}", _businessId);
@@ -76,10 +83,14 @@ namespace PurchaseAssistant.IntegrationTests.Dashboard
 
             // Add 1 Other tenant item (Out of Stock), should NOT be counted
             var otherBId = Guid.NewGuid();
+            _otherBusinessId = otherBId;
+            var otherCategoryId = Guid.NewGuid();
+            await _context.Database.ExecuteSqlRawAsync("INSERT INTO \"Businesses\" (\"Id\", \"Name\", \"IsActive\", \"CreatedAt\") VALUES ({0}, 'Other dashboard fixture', true, NOW())", otherBId);
+            await _context.Database.ExecuteSqlRawAsync("INSERT INTO \"Categories\" (\"Id\", \"BusinessId\", \"Name\", \"CreatedAt\") VALUES ({0}, {1}, 'Other category', NOW())", otherCategoryId, otherBId);
             await _context.Database.ExecuteSqlRawAsync(
                 @"INSERT INTO ""CatalogItems"" (""Id"",""BusinessId"",""CategoryId"",""Name"",""ItemCode"",""CurrentStock"",""ReservedStock"",""PhysicalStock"",""ReorderLevel"",""RowVersion"",""DefaultUnit"",""IsActive"",""CreatedAt"")
                   VALUES (gen_random_uuid(),{0},{1},'OItem','O1',0,0,0,10,gen_random_uuid(),'PCS',true,NOW())",
-                otherBId, categoryId);
+                otherBId, otherCategoryId);
 
             // Add purchases
             await AddPurchase(Guid.NewGuid(), supplierId, PurchaseStatus.Draft, 100);
@@ -96,7 +107,7 @@ namespace PurchaseAssistant.IntegrationTests.Dashboard
             dash.PurchaseMetrics.PendingPurchasesCount.Should().Be(2); // Draft + Confirmed
             dash.PurchaseMetrics.ActivePurchasesCount.Should().Be(2);
             dash.PurchaseMetrics.CompletedPurchasesCount.Should().Be(1);
-            dash.PurchaseMetrics.TotalPurchaseSpend.Should().Be(800);
+            dash.PurchaseMetrics.TotalPurchaseSpend.Should().Be(700);
 
             // Alerts
             dash.OperationalAlerts.Should().Contain(a => a.Type == NotificationType.OutOfStock);
@@ -110,7 +121,7 @@ namespace PurchaseAssistant.IntegrationTests.Dashboard
         {
             await _context.Database.ExecuteSqlRawAsync(
                 @"INSERT INTO ""CatalogItems"" (""Id"",""BusinessId"",""CategoryId"",""Name"",""ItemCode"",""CurrentStock"",""ReservedStock"",""PhysicalStock"",""ReorderLevel"",""RowVersion"",""DefaultUnit"",""IsActive"",""CreatedAt"")
-                  VALUES ({0},{1},(SELECT ""Id"" FROM ""Categories"" LIMIT 1),'Item','IT-' || {0}::text, {2},0,{2},{3},gen_random_uuid(),'PCS',true,NOW())",
+                  VALUES ({0},{1},(SELECT ""Id"" FROM ""Categories"" WHERE ""BusinessId"" = {1} LIMIT 1),'Item','IT-' || {0}::text, {2},0,{2},{3},gen_random_uuid(),'PCS',true,NOW())",
                 id, _businessId, stock, reorder);
         }
 

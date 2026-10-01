@@ -28,6 +28,7 @@ public class GroqProvider : IAIProvider
                 model = "llama3-8b-8192", // Use a default model
                 messages = new[]
                 {
+                    new { role = "system", content = request.SystemPrompt ?? "Extract purchase intent as JSON." },
                     new { role = "user", content = request.Prompt }
                 }
             };
@@ -36,14 +37,14 @@ public class GroqProvider : IAIProvider
             httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
             httpRequest.Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(payload), System.Text.Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(httpRequest, ct);
+            using var response = await _httpClient.SendAsync(httpRequest, ct);
             response.EnsureSuccessStatusCode();
 
-            var data = await response.Content.ReadFromJsonAsync<dynamic>(cancellationToken: ct);
-            string? content = data?.choices[0].message.content;
+            using var data = await System.Text.Json.JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+            string? content = data.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
 
             return new AIResponse(
-                Success: true,
+                Success: !string.IsNullOrWhiteSpace(content),
                 Content: content,
                 Error: null,
                 Provider: ProviderType.ToString(),
@@ -51,12 +52,13 @@ public class GroqProvider : IAIProvider
                 LatencyMs: (decimal)(DateTime.UtcNow - startTime).TotalMilliseconds
             );
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception)
         {
             return new AIResponse(
                 Success: false,
                 Content: null,
-                Error: ex.Message,
+                Error: "AI_PROVIDER_FAILED",
                 Provider: ProviderType.ToString(),
                 ModelUsed: "llama3-8b-8192",
                 LatencyMs: (decimal)(DateTime.UtcNow - startTime).TotalMilliseconds

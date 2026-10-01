@@ -23,7 +23,7 @@ public class PermissionAuthorizationHandlerTests
         {
             new Claim("permissions", "catalog.view"),
             new Claim("permissions", "catalog.edit")
-        }));
+        }, "test"));
         var context = new AuthorizationHandlerContext(new[] { requirement }, user, null);
 
         // Act
@@ -41,7 +41,7 @@ public class PermissionAuthorizationHandlerTests
         var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
         {
             new Claim("role", "Owner")
-        }));
+        }, "test"));
         var context = new AuthorizationHandlerContext(new[] { requirement }, user, null);
 
         // Act
@@ -59,7 +59,7 @@ public class PermissionAuthorizationHandlerTests
         var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
         {
             new Claim("role", "SuperAdmin")
-        }));
+        }, "test"));
         var context = new AuthorizationHandlerContext(new[] { requirement }, user, null);
 
         // Act
@@ -78,7 +78,7 @@ public class PermissionAuthorizationHandlerTests
         {
             new Claim("role", "Manager"),
             new Claim("permissions", "catalog.view") // missing edit
-        }));
+        }, "test"));
         var context = new AuthorizationHandlerContext(new[] { requirement }, user, null);
 
         // Act

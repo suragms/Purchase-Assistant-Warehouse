@@ -10,6 +10,11 @@ namespace PurchaseAssistant.Application.Interfaces
         Task<CatalogItemDto> CreateAsync(CatalogItemDto dto, CancellationToken cancellationToken = default);
         Task<CatalogItemDto> UpdateAsync(Guid id, CatalogItemDto dto, CancellationToken cancellationToken = default);
         Task DeleteAsync(Guid id, CancellationToken cancellationToken = default);
+        Task ArchiveAsync(Guid id, Guid expectedVersion, CancellationToken cancellationToken = default);
+        Task<List<VariantDto>> GetVariantsAsync(Guid itemId, CancellationToken cancellationToken = default);
+        Task<VariantDto> CreateVariantAsync(Guid itemId, VariantDto dto, CancellationToken cancellationToken = default);
+        Task<VariantDto> UpdateVariantAsync(Guid itemId, Guid variantId, VariantDto dto, CancellationToken cancellationToken = default);
+        Task DeleteVariantAsync(Guid itemId, Guid variantId, Guid expectedVersion, CancellationToken cancellationToken = default);
         Task<List<DuplicateCandidateDto>> GetDuplicateCandidatesAsync(int? minSimilarity = 70);
     }
 }

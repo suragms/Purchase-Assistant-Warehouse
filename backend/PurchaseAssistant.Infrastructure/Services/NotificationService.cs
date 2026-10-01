@@ -22,6 +22,8 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<PaginatedResult<NotificationDto>> GetNotificationsAsync(Guid userId, int page, int pageSize, bool onlyUnread)
         {
+            page = Math.Clamp(page, 1, 10000);
+            pageSize = Math.Clamp(pageSize, 1, 100);
             var query = _context.Notifications
                 .AsNoTracking()
                 .Where(n => n.UserId == userId);

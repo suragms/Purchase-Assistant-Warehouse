@@ -19,24 +19,59 @@ using PurchaseAssistant.Application.DTOs.AI;
 using PurchaseAssistant.Application.Interfaces.AI;
 using PurchaseAssistant.Infrastructure.Services.AI;
 using Microsoft.EntityFrameworkCore;
-using PurchaseAssistant.Application.Interfaces;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using System.Text.Json;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.DataProtection;
+using System.Security.Cryptography.X509Certificates;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers(options => options.Filters.Add<OwnerFinancialResultFilter>());
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
+if (builder.Environment.IsProduction()) ProductionConfiguration.Validate(builder.Configuration);
+var protection = builder.Services.AddDataProtection().SetApplicationName("PurchaseAssistant");
+var keyRingPath = builder.Configuration["DataProtection:KeyRingPath"];
+if (!string.IsNullOrWhiteSpace(keyRingPath))
+{
+    protection.PersistKeysToFileSystem(new DirectoryInfo(keyRingPath));
+    if (OperatingSystem.IsWindows()) protection.ProtectKeysWithDpapi();
+    else if (!string.IsNullOrWhiteSpace(builder.Configuration["DataProtection:CertificatePath"]))
+        protection.ProtectKeysWithCertificate(X509CertificateLoader.LoadPkcs12FromFile(
+            builder.Configuration["DataProtection:CertificatePath"]!, builder.Configuration["DataProtection:CertificatePassword"]));
+}
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("auth", context => RateLimitPartition.GetSlidingWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new SlidingWindowRateLimiterOptions
+        { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 6, QueueLimit = 0 }));
+    options.AddPolicy("ai", context => RateLimitPartition.GetSlidingWindowLimiter(
+        context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new SlidingWindowRateLimiterOptions
+        { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 6, QueueLimit = 0 }));
+});
 
 // Settings & DI
+var jwtSecret = builder.Configuration["Jwt:SecretKey"];
+if (string.IsNullOrWhiteSpace(jwtSecret))
+{
+    if (!builder.Environment.IsDevelopment())
+        throw new InvalidOperationException("Configure Jwt:SecretKey before starting the server.");
+    // Development sessions expire when the server restarts; no shared signing secret in source.
+    jwtSecret = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(64));
+}
+if (Encoding.UTF8.GetByteCount(jwtSecret) < 32)
+    throw new InvalidOperationException("Jwt:SecretKey must contain at least 32 bytes.");
 builder.Services.Configure<JwtOptions>(options =>
 {
     options.Issuer = "PurchaseAssistant";
     options.Audience = "PurchaseAssistantApp";
-    options.SecretKey = "SuperSecretKeyForDevelopmentOnlyMakeSureToChangeInProduction12345!";
+    options.SecretKey = jwtSecret;
     options.ExpirationMinutes = 15;
 });
 
@@ -53,6 +88,7 @@ builder.Services.AddScoped<IBrokerService, BrokerService>();
 builder.Services.AddScoped<IGlobalSearchService, GlobalSearchService>();
 builder.Services.AddScoped<IStockService, StockService>();
 builder.Services.AddScoped<IPurchaseService, PurchaseService>();
+builder.Services.AddScoped<IPurchaseDamageService, PurchaseDamageService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IReportService, ReportService>();
@@ -87,6 +123,15 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                if (context.Principal == null || !await CurrentUserService.ValidateSessionAsync(context.Principal, db))
+                    context.Fail("The account or business membership is no longer active.");
+            }
+        };
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -95,8 +140,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = "PurchaseAssistant",
             ValidAudience = "PurchaseAssistantApp",
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("SuperSecretKeyForDevelopmentOnlyMakeSureToChangeInProduction12345!")),
-            ClockSkew = System.TimeSpan.Zero
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            ClockSkew = System.TimeSpan.Zero,
+            RoleClaimType = "role"
         };
     });
 
@@ -104,40 +150,45 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddAuthorization(options =>
 {
+    options.AddPolicy("RequireSelectedBusiness", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId"));
     // Define commonly used policies safely
-    options.AddPolicy("RequireUsersView", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.UsersView)));
-    options.AddPolicy("RequireUsersManage", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.UsersManage)));
-    options.AddPolicy("RequireCatalogView", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.CatalogView)));
-    options.AddPolicy("RequireCatalogCreate", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.CatalogCreate)));
-    options.AddPolicy("RequireCatalogEdit", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.CatalogEdit)));
-    options.AddPolicy("RequireCatalogArchive", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.CatalogArchive)));
-    options.AddPolicy("RequireSupplierView", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.SupplierView)));
-    options.AddPolicy("RequireSupplierCreate", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.SupplierCreate)));
-    options.AddPolicy("RequireSupplierEdit", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.SupplierEdit)));
-    options.AddPolicy("RequireSupplierDelete", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.SupplierDelete)));
-    options.AddPolicy("RequireBrokerView", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.BrokerView)));
-    options.AddPolicy("RequireBrokerCreate", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.BrokerCreate)));
-    options.AddPolicy("RequireBrokerEdit", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.BrokerEdit)));
-    options.AddPolicy("RequireBrokerDelete", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.BrokerDelete)));
-    options.AddPolicy("RequireStockView", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.StockView)));
-    options.AddPolicy("RequireStockAdjust", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.StockAdjust)));
-    options.AddPolicy("RequireStockPhysical", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.StockPhysical)));
-    options.AddPolicy("RequireStockSystem", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.StockSystem)));
-    options.AddPolicy("RequireReportsView", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.ReportsView)));
-    options.AddPolicy("RequirePurchaseView", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.PurchaseView)));
-    options.AddPolicy("RequirePurchaseCreate", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.PurchaseCreate)));
-    options.AddPolicy("RequirePurchaseEdit", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.PurchaseEdit)));
-    options.AddPolicy("RequirePurchaseDelete", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.PurchaseDelete)));
-    options.AddPolicy("RequirePurchaseVerify", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.PurchaseVerify)));
-    options.AddPolicy("RequirePurchaseCommit", policy => policy.Requirements.Add(new PermissionRequirement(Permissions.PurchaseCommit)));
+    options.AddPolicy("RequireUsersView", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.UsersView)));
+    options.AddPolicy("RequireUsersManage", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.UsersManage)));
+    options.AddPolicy("RequireCatalogView", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.CatalogView)));
+    options.AddPolicy("RequireCatalogCreate", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.CatalogCreate)));
+    options.AddPolicy("RequireCatalogEdit", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.CatalogEdit)));
+    options.AddPolicy("RequireCatalogArchive", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.CatalogArchive)));
+    options.AddPolicy("RequireSupplierView", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.SupplierView)));
+    options.AddPolicy("RequireSupplierCreate", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.SupplierCreate)));
+    options.AddPolicy("RequireSupplierEdit", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.SupplierEdit)));
+    options.AddPolicy("RequireSupplierDelete", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.SupplierDelete)));
+    options.AddPolicy("RequireBrokerView", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.BrokerView)));
+    options.AddPolicy("RequireBrokerCreate", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.BrokerCreate)));
+    options.AddPolicy("RequireBrokerEdit", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.BrokerEdit)));
+    options.AddPolicy("RequireBrokerDelete", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.BrokerDelete)));
+    options.AddPolicy("RequireStockView", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.StockView)));
+    options.AddPolicy("RequireStockAdjust", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.StockAdjust)));
+    options.AddPolicy("RequireStockPhysical", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.StockPhysical)));
+    options.AddPolicy("RequireStockSystem", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.StockSystem)));
+    options.AddPolicy("RequireReportsView", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.ReportsView)));
+    options.AddPolicy("RequirePurchaseView", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.PurchaseView)));
+    options.AddPolicy("RequirePurchaseCreate", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.PurchaseCreate)));
+    options.AddPolicy("RequirePurchaseEdit", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.PurchaseEdit)));
+    options.AddPolicy("RequirePurchaseDelete", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.PurchaseDelete)));
+    options.AddPolicy("RequirePurchaseVerify", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.PurchaseVerify)));
+    options.AddPolicy("RequirePurchaseDelivery", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.PurchaseDelivery)));
+    options.AddPolicy("RequirePurchaseCommit", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.PurchaseCommit)));
+    options.AddPolicy("RequireDamageReport", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.PurchaseDamageReport)));
+    options.AddPolicy("RequireDamageApprove", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.PurchaseDamageApprove)));
 });
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", b =>
     {
-        b.WithOrigins("http://localhost:5173", "http://localhost:5174", "http://localhost:3000")
-         .SetIsOriginAllowed(origin => new Uri(origin).Host == "localhost")
+        var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+            ?? (builder.Environment.IsDevelopment() ? new[] { "http://localhost:5173", "http://localhost:5174", "http://localhost:3000" } : Array.Empty<string>());
+        b.WithOrigins(origins)
          .AllowAnyHeader()
          .AllowAnyMethod()
          .AllowCredentials();
@@ -151,21 +202,36 @@ app.UseExceptionHandler(errorApp =>
     errorApp.Run(async context =>
     {
         context.Response.ContentType = "application/json";
-        var exceptionHandlerPathFeature = context.Features.Get<IExceptionHandlerPathFeature>();
 
-        // Standardized 500 error mapping
+        var exception = context.Features.Get<IExceptionHandlerFeature>()?.Error;
+        var status = exception switch
+        {
+            DbUpdateConcurrencyException => 409,
+            DbUpdateException { InnerException: Npgsql.PostgresException { SqlState: "23505" } } => 409,
+            ArgumentException => 400,
+            KeyNotFoundException => 404,
+            UnauthorizedAccessException => 403,
+            _ => 500
+        };
+        var safeMessage = status switch
+        {
+            409 => "The record changed or already exists. Refresh before retrying.",
+            400 => "Check the submitted fields and try again.",
+            404 => "The requested record was not found in this business.",
+            403 => "You do not have permission to perform this action.",
+            _ => "An unexpected error occurred."
+        };
         var response = new
         {
             error = new
             {
-                code = "INTERNAL_SERVER_ERROR",
-                message = "An unexpected error occurred.",
-                details = exceptionHandlerPathFeature?.Error.Message,
+                code = status == 409 ? "VERSION_OR_DUPLICATE_CONFLICT" : status == 400 ? "VALIDATION_ERROR" : status == 404 ? "NOT_FOUND" : "INTERNAL_SERVER_ERROR",
+                message = safeMessage,
                 requestId = context.TraceIdentifier
             }
         };
 
-        context.Response.StatusCode = 500;
+        context.Response.StatusCode = status;
         await context.Response.WriteAsync(JsonSerializer.Serialize(response));
     });
 });
@@ -179,8 +245,23 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("Frontend");
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 app.MapControllers();
+app.MapGet("/health/live", () => Results.Ok(new { status = "alive" })).AllowAnonymous();
+app.MapGet("/health/ready", async (AppDbContext db, CancellationToken ct) =>
+{
+    try
+    {
+        var ready = await db.Database.CanConnectAsync(ct) && !(await db.Database.GetPendingMigrationsAsync(ct)).Any()
+            && !db.Database.HasPendingModelChanges();
+        return Results.Json(new { status = ready ? "ready" : "unavailable" }, statusCode: ready ? 200 : 503);
+    }
+    catch (Exception)
+    {
+        return Results.Json(new { status = "unavailable" }, statusCode: 503);
+    }
+}).AllowAnonymous();
 
 // Ensure Database is migrated and seeded with default admin
 if (app.Environment.IsDevelopment())
@@ -206,22 +287,14 @@ if (app.Environment.IsDevelopment())
             Console.WriteLine("Seeded initial business.");
         }
 
-        // Update permissions for admin
+        // Seed missing defaults only; never replace an existing explicit permission set on startup.
         var adminUser = await db.Users.FirstOrDefaultAsync(u => u.Email == "admin@warehouse.local");
         if (adminUser != null)
         {
             var membership = await db.Memberships.FirstOrDefaultAsync(m => m.UserId == adminUser.Id);
-            if (membership != null)
+            if (membership != null && string.IsNullOrWhiteSpace(membership.PermissionsJson))
             {
-                membership.PermissionsJson = JsonSerializer.Serialize(new[] {
-                    "users.view", "users.manage",
-                    "catalog.view", "catalog.manage",
-                    "stock.view", "stock.manage",
-                    "purchases.view", "purchases.manage",
-                    "supplier.view", "supplier.create", "supplier.edit", "supplier.delete",
-                    "broker.view", "broker.create", "broker.edit", "broker.delete",
-                    "reports.view", "settings.manage"
-                });
+                membership.PermissionsJson = JsonSerializer.Serialize(Permissions.ForRole(membership.Role));
                 await db.SaveChangesAsync();
                 Console.WriteLine("Verified/Updated permissions for admin user.");
             }
@@ -234,3 +307,5 @@ if (app.Environment.IsDevelopment())
 }
 
 app.Run();
+
+public partial class Program { }

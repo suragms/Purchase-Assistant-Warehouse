@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using PurchaseAssistant.Application.DTOs.Catalog;
 using PurchaseAssistant.Application.DTOs.Stock;
+using PurchaseAssistant.Application.DTOs.Purchase;
 using PurchaseAssistant.Application.Interfaces;
 using PurchaseAssistant.Domain.Entities;
 using PurchaseAssistant.Infrastructure.Data;
@@ -52,6 +53,8 @@ namespace PurchaseAssistant.Infrastructure.Services
         public async Task<PaginatedResult<StockItemDto>> GetStockItemsAsync(
             int page, int pageSize, string? search, bool? lowStockOnly, bool? outOfStockOnly)
         {
+            page = Math.Clamp(page, 1, 10000);
+            pageSize = Math.Clamp(pageSize, 1, 100);
             var query = GetBaseQuery();
 
             if (!string.IsNullOrWhiteSpace(search))
@@ -104,6 +107,8 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<PaginatedResult<StockMovementDto>> GetItemActivityAsync(Guid itemId, int page, int pageSize)
         {
+            page = Math.Clamp(page, 1, 10000);
+            pageSize = Math.Clamp(pageSize, 1, 100);
             var businessId = _currentUser.BusinessId!.Value;
 
             var itemExists = await _context.CatalogItems
@@ -168,12 +173,10 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<StockItemDto> AdjustStockAsync(Guid itemId, AdjustStockRequestDto request)
         {
-            var existingTx = _context.Database.CurrentTransaction;
-            Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? tx = null;
-            if (existingTx == null)
-            {
-                tx = await _context.Database.BeginTransactionAsync();
-            }
+            if (request.QuantityDelta == 0 || request.QuantityDelta > PurchaseInputLimits.MaxValue || request.QuantityDelta < -PurchaseInputLimits.MaxValue || decimal.Round(request.QuantityDelta, 4) != request.QuantityDelta)
+                throw new ArgumentException("Enter a nonzero stock adjustment within range, with at most four decimal places.");
+            await using var tx = _context.Database.CurrentTransaction == null
+                ? await _context.Database.BeginTransactionAsync() : null;
 
             var item = await GetAndValidateItemForUpdate(itemId, request.ExpectedVersion);
 
@@ -184,6 +187,8 @@ namespace PurchaseAssistant.Infrastructure.Services
 
             if (availableAfter < 0)
                 throw new InvalidOperationException("INSUFFICIENT_STOCK");
+            if (qtyAfter > PurchaseInputLimits.MaxValue)
+                throw new ArgumentException("Stock quantity exceeds the supported range.");
 
             item.CurrentStock = qtyAfter;
             item.RowVersion = Guid.NewGuid();
@@ -196,6 +201,8 @@ namespace PurchaseAssistant.Infrastructure.Services
                 QuantityDelta = request.QuantityDelta,
                 QuantityBefore = qtyBefore,
                 QuantityAfter = qtyAfter,
+                ReferenceType = request.ReferenceType,
+                ReferenceId = request.ReferenceId,
                 Reason = request.Reason,
                 Notes = request.Notes,
                 CreatedById = _currentUser.UserId!.Value,
@@ -218,22 +225,16 @@ namespace PurchaseAssistant.Infrastructure.Services
                 }
                 throw new InvalidOperationException("STOCK_VERSION_CONFLICT");
             }
-            finally
-            {
-                tx?.Dispose();
-            }
 
             return await GetStockDetailAsync(item.Id);
         }
 
         public async Task<StockItemDto> UpdatePhysicalStockAsync(Guid itemId, UpdatePhysicalStockRequestDto request)
         {
-            var existingTx = _context.Database.CurrentTransaction;
-            Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? tx = null;
-            if (existingTx == null)
-            {
-                tx = await _context.Database.BeginTransactionAsync();
-            }
+            if (request.PhysicalStock < 0 || request.PhysicalStock > PurchaseInputLimits.MaxValue || decimal.Round(request.PhysicalStock, 4) != request.PhysicalStock)
+                throw new ArgumentException("Enter a nonnegative physical count within range, with at most four decimal places.");
+            await using var tx = _context.Database.CurrentTransaction == null
+                ? await _context.Database.BeginTransactionAsync() : null;
 
             var item = await GetAndValidateItemForUpdate(itemId, request.ExpectedVersion);
 
@@ -271,22 +272,14 @@ namespace PurchaseAssistant.Infrastructure.Services
                 }
                 throw new InvalidOperationException("STOCK_VERSION_CONFLICT");
             }
-            finally
-            {
-                tx?.Dispose();
-            }
 
             return await GetStockDetailAsync(item.Id);
         }
 
         public async Task<StockItemDto> ReconcileStockAsync(Guid itemId, ReconcileStockRequestDto request)
         {
-            var existingTx = _context.Database.CurrentTransaction;
-            Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? tx = null;
-            if (existingTx == null)
-            {
-                tx = await _context.Database.BeginTransactionAsync();
-            }
+            await using var tx = _context.Database.CurrentTransaction == null
+                ? await _context.Database.BeginTransactionAsync() : null;
 
             var item = await GetAndValidateItemForUpdate(itemId, request.ExpectedVersion);
 
@@ -333,10 +326,6 @@ namespace PurchaseAssistant.Infrastructure.Services
                     await tx.RollbackAsync();
                 }
                 throw new InvalidOperationException("STOCK_VERSION_CONFLICT");
-            }
-            finally
-            {
-                tx?.Dispose();
             }
 
             return await GetStockDetailAsync(item.Id);

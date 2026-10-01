@@ -4,6 +4,8 @@ namespace PurchaseAssistant.Domain.Enums
     {
         Pending = 0,
         Partial = 1,
-        Paid = 2
+        Paid = 2,
+        Overdue = 3,
+        DueSoon = 4
     }
 }

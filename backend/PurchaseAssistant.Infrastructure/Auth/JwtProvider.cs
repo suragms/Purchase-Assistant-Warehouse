@@ -20,13 +20,15 @@ namespace PurchaseAssistant.Infrastructure.Auth
             _options = options.Value;
         }
 
-        public string GenerateAccessToken(User user, Membership? activeMembership)
+        public string GenerateAccessToken(User user, Membership? activeMembership, Guid sessionId)
         {
+            if (sessionId == Guid.Empty) throw new ArgumentException("A session is required.", nameof(sessionId));
             var claims = new List<Claim>
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, user.Email),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim("sessionId", sessionId.ToString())
             };
 
             if (activeMembership != null)

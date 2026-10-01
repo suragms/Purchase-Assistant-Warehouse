@@ -1,13 +1,16 @@
-import { useState, useEffect } from 'react';
+import { formatMoney } from '../../lib/formatMoney';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
-import { purchaseApi, type UpsertPurchaseOrderDto } from '../../api/purchaseApi';
+import { purchaseApi, type UpsertPurchaseOrderDto, type PurchasePreviewDto, type UpsertPurchaseItemDto } from '../../api/purchaseApi';
 import { supplierApi } from '../../api/supplierApi';
 import { brokerApi } from '../../api/brokerApi';
 import { catalogApi } from '../../api/catalogApi';
-import { purchaseKeys } from '../../lib/queryKeys';
+import { purchaseKeys, dashboardKeys, reportKeys } from '../../lib/queryKeys';
 import { ShoppingBag, Plus, Trash2, ArrowLeft, Save } from 'lucide-react';
 import { PurchaseAssistant } from '../../components/AI/PurchaseAssistant';
+import { useToast } from '../../components/ui/ToastProvider';
+import { isValidQuantity, MAX_PURCHASE_VALUE, purchaseErrorMessage } from '../../lib/purchaseValidation';
 import type { PurchaseIntentItemCandidateDto } from '../../api/purchaseIntentApi';
 
 interface PurchaseFormProps {
@@ -18,14 +21,28 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
+  const submitting = useRef(false);
+  const orderNumber = useRef<string | undefined>(undefined);
+  const [preview, setPreview] = useState<{ data: PurchasePreviewDto; snapshot: string } | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (submitError) { errorRef.current?.focus(); errorRef.current?.scrollIntoView?.({ block: 'center' }); }
+  }, [submitError]);
+  const [draftLabels, setDraftLabels] = useState<Record<string, string>>({});
+  const [draftSupplier, setDraftSupplier] = useState<{ id: string; name: string }>();
 
   const [supplierId, setSupplierId] = useState('');
   const [brokerId, setBrokerId] = useState('');
   const [notes, setNotes] = useState('');
-  const [taxTotal, setTaxTotal] = useState<number>(0);
-  const [items, setItems] = useState<Array<{ catalogItemId: string; orderedQuantity: number; unitPrice: number; notes?: string }>>([
+  const [paymentDays, setPaymentDays] = useState('');
+  const [items, setItems] = useState<UpsertPurchaseItemDto[]>([
     { catalogItemId: '', orderedQuantity: 1, unitPrice: 0, notes: '' }
   ]);
+
+  useEffect(() => { setPreview(null); }, [supplierId, brokerId, notes, items, paymentDays]);
 
   const { data: suppliersData } = useQuery({
     queryKey: ['suppliers', 'list'],
@@ -53,30 +70,40 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
       setSupplierId(existingOrder.supplierId);
       setBrokerId(existingOrder.brokerId || '');
       setNotes(existingOrder.notes || '');
-      setTaxTotal(existingOrder.taxTotal);
+      setPaymentDays(existingOrder.paymentDays?.toString() ?? '');
       setItems(existingOrder.items.map(i => ({
         catalogItemId: i.catalogItemId,
         orderedQuantity: i.orderedQuantity,
-        unitPrice: i.unitPrice,
+        unitPrice: i.unitPrice ?? 0,
+        discountPercent: i.discountPercent,
+        taxPercent: i.taxPercent,
+        kgPerUnit: i.kgPerUnit,
+        landingCostPerKg: i.landingCostPerKg,
         notes: i.notes || ''
       })));
     }
   }, [edit, existingOrder]);
 
-  const handleDraftConfirmed = (candidateItems: PurchaseIntentItemCandidateDto[], inferredSupplierId?: string) => {
+  const handleDraftConfirmed = (candidateItems: PurchaseIntentItemCandidateDto[], inferredSupplierId?: string, inferredSupplierName?: string) => {
+    if (submitting.current) return;
+    setDraftLabels(Object.fromEntries(candidateItems.filter(i => i.catalogItemId).map(i => [i.catalogItemId!, i.catalogItemName || i.itemCode || 'Suggested item'])));
+    setDraftSupplier(inferredSupplierId ? { id: inferredSupplierId, name: inferredSupplierName || 'Suggested supplier' } : undefined);
     setItems(candidateItems.map(i => ({
       catalogItemId: i.catalogItemId || '',
       orderedQuantity: i.requestedQuantity,
       unitPrice: 0,
       notes: ''
     })));
-    if (inferredSupplierId) setSupplierId(inferredSupplierId);
+    setSupplierId(inferredSupplierId || '');
+    setSubmitError('');
   };
 
   const createMutation = useMutation({
     mutationFn: (dto: UpsertPurchaseOrderDto) => purchaseApi.createPurchase(dto),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: purchaseKeys.all });
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+      showToast(edit ? 'Purchase order updated.' : 'Purchase order created.');
       navigate(`/purchases/${res.id}`);
     },
   });
@@ -85,12 +112,13 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
     mutationFn: (dto: UpsertPurchaseOrderDto) => purchaseApi.updatePurchase(id!, dto),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: purchaseKeys.all });
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+      queryClient.invalidateQueries({ queryKey: reportKeys.all });
+      showToast(edit ? 'Purchase order updated.' : 'Purchase order created.');
       navigate(`/purchases/${res.id}`);
     },
   });
 
-  const subtotal = items.reduce((acc, item) => acc + (item.orderedQuantity * item.unitPrice), 0);
-  const grandTotal = subtotal + Number(taxTotal || 0);
 
   const handleAddItem = () => {
     setItems([...items, { catalogItemId: '', orderedQuantity: 1, unitPrice: 0, notes: '' }]);
@@ -109,37 +137,69 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
+    setSubmitError('');
     if (!supplierId) {
-      alert('Please select a supplier.');
+      setSubmitError('Please select a supplier.');
       return;
     }
-    if (items.length === 0 || items.some(i => !i.catalogItemId || i.orderedQuantity <= 0)) {
-      alert('Please ensure all items have a catalog item and valid ordered quantity.');
+    if (items.length === 0 || items.some(i => !i.catalogItemId || !isValidQuantity(i.orderedQuantity))) {
+      setSubmitError('Please ensure all items have a catalog item and valid ordered quantity.');
       return;
     }
 
+    if (items.some(i => !Number.isFinite(i.unitPrice) || i.unitPrice < 0
+        || !Number.isFinite(i.discountPercent ?? 0) || (i.discountPercent ?? 0) < 0 || (i.discountPercent ?? 0) > 100
+        || !Number.isFinite(i.taxPercent ?? 0) || (i.taxPercent ?? 0) < 0 || (i.taxPercent ?? 0) > 1000)) {
+      setSubmitError('Please enter valid prices and tax within the supported range.');
+      return;
+    }
+    // Keep the same unique number after a lost response; retries cannot create a second order.
+    if (!edit && !orderNumber.current) orderNumber.current = `PO-${crypto.randomUUID()}`;
+    if (paymentDays !== '' && (!Number.isInteger(Number(paymentDays)) || Number(paymentDays) < 0 || Number(paymentDays) > 3650)) {
+      setSubmitError('Payment terms must be between 0 and 3650 days.'); return;
+    }
     const dto: UpsertPurchaseOrderDto = {
+      ...(paymentDays !== '' ? { paymentDays: Number(paymentDays) } : {}),
+      expectedVersion: edit ? existingOrder?.version : undefined,
+      orderNumber: edit ? existingOrder?.orderNumber : orderNumber.current,
       supplierId,
       brokerId: brokerId || undefined,
       notes: notes || undefined,
-      taxTotal: Number(taxTotal),
       items: items.map(i => ({
         catalogItemId: i.catalogItemId,
         orderedQuantity: Number(i.orderedQuantity),
         unitPrice: Number(i.unitPrice),
+        discountPercent: i.discountPercent,
+        taxPercent: i.taxPercent,
+        kgPerUnit: i.kgPerUnit,
+        landingCostPerKg: i.landingCostPerKg,
         notes: i.notes || undefined
       }))
     };
 
-    if (edit && id) {
-      await updateMutation.mutateAsync(dto);
-    } else {
-      await createMutation.mutateAsync(dto);
+    submitting.current = true;
+    try {
+      const snapshot = JSON.stringify(dto);
+      if (!preview || preview.snapshot !== snapshot) {
+        setPreviewing(true);
+        const result = await purchaseApi.previewPurchase(dto);
+        setPreview({ data: result, snapshot });
+        return;
+      }
+      dto.previewToken = preview.data.previewToken;
+      if (edit && id) await updateMutation.mutateAsync(dto);
+      else await createMutation.mutateAsync(dto);
+    } catch (error) {
+      setSubmitError(purchaseErrorMessage(error));
+    } finally {
+      submitting.current = false;
+      setPreviewing(false);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl min-w-0 mx-auto space-y-6 break-words">
       <div className="flex items-center gap-4">
         <button
           onClick={() => navigate(-1)}
@@ -148,7 +208,7 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
             <ShoppingBag className="w-7 h-7 text-indigo-600" />
             {edit ? 'Edit Purchase Order' : 'Create Purchase Order'}
           </h1>
@@ -158,20 +218,25 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
         </div>
       </div>
 
-      <PurchaseAssistant onDraftConfirmed={handleDraftConfirmed} />
+      <PurchaseAssistant onDraftConfirmed={handleDraftConfirmed} disabled={previewing || createMutation.isPending || updateMutation.isPending} />
+      {edit && existingOrder && existingOrder.taxTotal > 0 && existingOrder.items.every(i => !i.taxPercent) &&
+        <p role="status" className="rounded-lg bg-amber-50 p-4 text-sm text-amber-900">This order uses a legacy tax amount. Enter verified line tax rates and review the recalculated preview before saving.</p>}
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {submitError && <p ref={errorRef} tabIndex={-1} role="alert" className="text-sm text-red-700">{submitError}</p>}
         {/* Main Details Card */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white p-4 sm:p-6 min-w-0 rounded-xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Supplier *</label>
             <select
+              aria-label="Supplier"
               required
               value={supplierId}
               onChange={(e) => setSupplierId(e.target.value)}
-              className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full min-w-0 px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="">Select Supplier...</option>
+              {draftSupplier && !suppliersData?.data?.some(s => s.id === draftSupplier.id) && <option value={draftSupplier.id}>{draftSupplier.name}</option>}
               {suppliersData?.data?.map(s => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
@@ -183,7 +248,7 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
             <select
               value={brokerId}
               onChange={(e) => setBrokerId(e.target.value)}
-              className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full min-w-0 px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="">Select Broker...</option>
               {brokersData?.data?.map(b => (
@@ -193,20 +258,23 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
           </div>
 
           <div className="md:col-span-2">
+            <label htmlFor="payment-days" className="block text-sm font-medium text-slate-700 mb-1">Payment terms (days)</label>
+            <input id="payment-days" type="number" min="0" max="3650" step="1" value={paymentDays} onChange={e => setPaymentDays(e.target.value)}
+              className="w-full mb-4 px-3 py-2 rounded-lg border border-slate-300" placeholder="Optional" />
             <label className="block text-sm font-medium text-slate-700 mb-1">Notes / Terms</label>
             <textarea
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Delivery instructions, payment terms, etc."
-              className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full min-w-0 px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
         </div>
 
         {/* Line Items Card */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
-          <div className="flex items-center justify-between">
+        <div className="bg-white p-4 sm:p-6 min-w-0 rounded-xl shadow-sm border border-slate-200 space-y-4">
+          <div className="flex flex-wrap gap-2 items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-900">Purchase Items</h2>
             <button
               type="button"
@@ -223,12 +291,14 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
                 <div className="md:col-span-5">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Catalog Item *</label>
                   <select
+                    aria-label={`Catalog item ${index + 1}`}
                     required
                     value={item.catalogItemId}
                     onChange={(e) => handleItemChange(index, 'catalogItemId', e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full min-w-0 px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
                     <option value="">Select item...</option>
+                    {item.catalogItemId && draftLabels[item.catalogItemId] && !catalogData?.data?.some(c => c.id === item.catalogItemId) && <option value={item.catalogItemId}>{draftLabels[item.catalogItemId]}</option>}
                     {catalogData?.data?.map(c => (
                       <option key={c.id} value={c.id}>{c.itemCode} - {c.name}</option>
                     ))}
@@ -239,35 +309,66 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
                   <label className="block text-xs font-medium text-slate-600 mb-1">Qty *</label>
                   <input
                     type="number"
+                    aria-label={`Quantity ${index + 1}`}
                     min="0.0001"
-                    step="any"
+                    max={MAX_PURCHASE_VALUE}
+                    step="0.0001"
                     required
                     value={item.orderedQuantity}
                     onChange={(e) => handleItemChange(index, 'orderedQuantity', parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full min-w-0 px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Unit Price ($) *</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Unit landing cost (₹) *</label>
                   <input
                     type="number"
+                    aria-label={`Unit price ${index + 1}`}
                     min="0"
-                    step="0.01"
+                    max={MAX_PURCHASE_VALUE}
+                    step="0.0001"
                     required
                     value={item.unitPrice}
                     onChange={(e) => handleItemChange(index, 'unitPrice', parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full min-w-0 px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
 
                 <div className="md:col-span-2">
                   <label className="block text-xs font-medium text-slate-600 mb-1">Line Total</label>
                   <div className="px-3 py-2 text-sm font-semibold text-slate-900 bg-white border border-slate-200 rounded-lg">
-                    ${(item.orderedQuantity * item.unitPrice).toFixed(2)}
+                    {preview ? formatMoney(preview.data.items[index]?.lineTotal) : 'Preview to view'}
                   </div>
                 </div>
+                <div className="md:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="text-xs text-slate-600">Discount (%)
+                    <input aria-label={`Discount percent ${index + 1}`} type="number" min="0" max="100" step="0.01"
+                      value={item.discountPercent ?? 0} onChange={e => handleItemChange(index, 'discountPercent', Number(e.target.value))}
+                      className="mt-1 block w-full min-w-0 rounded-lg border border-slate-300 p-2" />
+                  </label>
+                  <label className="text-xs text-slate-600">Tax (%)
+                    <input aria-label={`Tax percent ${index + 1}`} type="number" min="0" max="1000" step="0.01"
+                      value={item.taxPercent ?? 0} onChange={e => handleItemChange(index, 'taxPercent', Number(e.target.value))}
+                      className="mt-1 block w-full min-w-0 rounded-lg border border-slate-300 p-2" />
+                  </label>
+                </div>
 
+                <details className="md:col-span-12">
+                  <summary className="cursor-pointer text-sm text-slate-600">Optional weight pricing</summary>
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="text-xs text-slate-600">Kg per ordered unit
+                      <input aria-label={`Kg per unit ${index + 1}`} type="number" min="0.0001" step="0.0001" max={MAX_PURCHASE_VALUE}
+                        value={item.kgPerUnit ?? ''} onChange={e => handleItemChange(index, 'kgPerUnit', e.target.value ? Number(e.target.value) : undefined)}
+                        className="mt-1 block w-full min-w-0 rounded-lg border border-slate-300 p-2" />
+                    </label>
+                    <label className="text-xs text-slate-600">Manual landing cost per kg (₹)
+                      <input aria-label={`Landing cost per kg ${index + 1}`} type="number" min="0.0001" step="0.0001" max={MAX_PURCHASE_VALUE}
+                        value={item.landingCostPerKg ?? ''} onChange={e => handleItemChange(index, 'landingCostPerKg', e.target.value ? Number(e.target.value) : undefined)}
+                        className="mt-1 block w-full min-w-0 rounded-lg border border-slate-300 p-2" />
+                    </label>
+                  </div>
+                </details>
                 <div className="md:col-span-1 flex justify-end">
                   <button
                     type="button"
@@ -284,30 +385,26 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
 
           {/* Totals Calculation */}
           <div className="pt-4 border-t border-slate-200 flex flex-col items-end space-y-2 text-sm">
-            <div className="flex justify-between w-64">
+            <div className="flex justify-between w-full max-w-64">
               <span className="text-slate-600">Subtotal:</span>
-              <span className="font-medium text-slate-900">${subtotal.toFixed(2)}</span>
+              <span className="font-medium text-slate-900">{preview ? formatMoney(preview.data.subtotal) : 'Preview to view'}</span>
             </div>
-            <div className="flex justify-between w-64 items-center">
+            <div className="flex justify-between w-full max-w-64 items-center">
               <span className="text-slate-600">Tax Total:</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={taxTotal}
-                onChange={(e) => setTaxTotal(parseFloat(e.target.value) || 0)}
-                className="w-28 px-2 py-1 text-right text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
+              <span className="font-medium text-slate-900">{preview ? formatMoney(preview.data.taxTotal) : 'Preview to view'}</span>
             </div>
-            <div className="flex justify-between w-64 text-base font-bold pt-2 border-t border-slate-200">
+            <div className="flex justify-between w-full max-w-64 text-base font-bold pt-2 border-t border-slate-200">
               <span className="text-slate-900">Grand Total:</span>
-              <span className="text-indigo-600">${grandTotal.toFixed(2)}</span>
+              <span className="text-indigo-600">{preview ? formatMoney(preview.data.grandTotal) : 'Preview to view'}</span>
             </div>
           </div>
         </div>
 
+        {preview && <div role="status" className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900">
+          Review the server preview above. Saving creates a draft; confirm the purchase separately after review.
+        </div>}
         {/* Submit Button */}
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-wrap justify-end gap-3">
           <button
             type="button"
             onClick={() => navigate(-1)}
@@ -317,11 +414,11 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
           </button>
           <button
             type="submit"
-            disabled={createMutation.isPending || updateMutation.isPending}
+            disabled={previewing || createMutation.isPending || updateMutation.isPending}
             className="inline-flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-sm transition-colors disabled:opacity-50"
           >
             <Save className="w-4 h-4" />
-            {edit ? 'Update Purchase Order' : 'Create Purchase Order'}
+            {previewing ? 'Calculating preview…' : createMutation.isPending || updateMutation.isPending ? 'Saving…' : !preview ? 'Preview Purchase' : edit ? 'Update Purchase Order' : 'Create Purchase Order'}
           </button>
         </div>
       </form>

@@ -18,10 +18,19 @@ export interface CatalogItem {
 }
 
 export interface CatalogItemDetail extends CatalogItem {
+  variants?: CatalogVariant[];
   lastSupplierId?: string;
   lastSupplierName?: string;
   lastBrokerId?: string;
   lastBrokerName?: string;
+}
+
+export interface CatalogVariant {
+  id: string;
+  name: string;
+  kgPerUnit?: number | null;
+  rowVersion: string;
+  isActive: boolean;
 }
 
 export interface Category {
@@ -127,8 +136,23 @@ export const catalogApi = {
   deleteItem: async (id: string): Promise<void> => {
     await apiClient.delete(`/catalog/items/${id}`);
   },
+  archiveItem: async (id: string, rowVersion: string): Promise<void> => {
+    await apiClient.patch(`/catalog/items/${id}/archive`, { rowVersion });
+  },
 
   // Categories
+  createVariant: async (itemId: string, variant: { name: string; kgPerUnit: number | null }): Promise<CatalogVariant> => {
+    const res = await apiClient.post(`/catalog/items/${itemId}/variants`, variant);
+    return res.data;
+  },
+  updateVariant: async (itemId: string, variant: CatalogVariant): Promise<CatalogVariant> => {
+    const res = await apiClient.put(`/catalog/items/${itemId}/variants/${variant.id}`, variant);
+    return res.data;
+  },
+  deleteVariant: async (itemId: string, variant: CatalogVariant): Promise<void> => {
+    await apiClient.delete(`/catalog/items/${itemId}/variants/${variant.id}?expectedVersion=${encodeURIComponent(variant.rowVersion)}`);
+  },
+
   getCategories: async (): Promise<Category[]> => {
     const res = await apiClient.get('/catalog/categories');
     return res.data;

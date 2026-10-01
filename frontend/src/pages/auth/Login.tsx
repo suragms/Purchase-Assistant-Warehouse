@@ -69,10 +69,11 @@ export const Login: React.FC = () => {
 
           <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
             <div>
-              <label className="block text-sm font-medium text-[#0F172A]">Email address</label>
+              <label htmlFor="login-email" className="block text-sm font-medium text-[#0F172A]">Email address</label>
               <div className="mt-1">
                 <input
                   {...register('email')}
+                  id="login-email"
                   type="email"
                   className="appearance-none block w-full px-3 py-2 border border-[#E2E8E6] rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#159A8A] focus:border-[#159A8A] sm:text-sm"
                 />
@@ -81,10 +82,11 @@ export const Login: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#0F172A]">Password</label>
+              <label htmlFor="login-password" className="block text-sm font-medium text-[#0F172A]">Password</label>
               <div className="mt-1">
                 <input
                   {...register('password')}
+                  id="login-password"
                   type="password"
                   className="appearance-none block w-full px-3 py-2 border border-[#E2E8E6] rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#159A8A] focus:border-[#159A8A] sm:text-sm"
                 />

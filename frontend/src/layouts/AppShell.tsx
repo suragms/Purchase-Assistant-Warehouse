@@ -8,6 +8,9 @@ import {
 import { useAuthStore } from '../stores/authStore';
 import { cn } from '../lib/cn';
 import { GlobalSearch } from '../components/search/GlobalSearch';
+import apiClient from '../api/apiClient';
+import type { AuthResponse } from '../types/auth';
+import { purchaseErrorMessage } from '../lib/purchaseValidation';
 
 interface NavItem {
   label: string;
@@ -110,12 +113,28 @@ const SidebarNavItem: React.FC<{ item: NavItem; onNavigate?: () => void }> = ({ 
 export const AppShell: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const { user, logout } = useAuthStore();
+  const { user, logout, setSession } = useAuthStore();
+  const [sessionBusy, setSessionBusy] = useState(false);
+  const [sessionError, setSessionError] = useState('');
+  const sessionRequest = React.useRef(false);
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handleLogout = async () => {
+    if (sessionRequest.current) return;
+    sessionRequest.current = true; setSessionBusy(true); setSessionError('');
+    try { await apiClient.post('/auth/logout'); logout(); navigate('/login'); }
+    catch (error) { setSessionError(purchaseErrorMessage(error)); }
+    finally { sessionRequest.current = false; setSessionBusy(false); }
+  };
+
+  const selectBusiness = async (businessId: string) => {
+    if (sessionRequest.current || businessId === user?.currentBusiness?.businessId) return;
+    sessionRequest.current = true; setSessionBusy(true); setSessionError('');
+    try {
+      const { data } = await apiClient.post<AuthResponse>('/auth/select-business', { businessId });
+      setSession(data.data.accessToken, data.data.user); navigate('/dashboard');
+    } catch (error) { setSessionError(purchaseErrorMessage(error)); }
+    finally { sessionRequest.current = false; setSessionBusy(false); }
   };
 
   // Global Ctrl+K / Cmd+K shortcut
@@ -143,6 +162,11 @@ export const AppShell: React.FC = () => {
         <div className="px-4 py-2 border-b border-white/10">
           <p className="text-xs text-[#8FC4BC]">Business</p>
           <p className="text-sm font-medium text-white truncate">{user.currentBusiness.businessName}</p>
+          {user.businesses.length > 1 && <select aria-label="Business" disabled={sessionBusy} value={user.currentBusiness.businessId}
+            className="mt-2 w-full rounded border border-white/20 bg-[#0E4F46] text-sm text-white p-2" onChange={e => void selectBusiness(e.target.value)}>
+            {user.businesses.map(b => <option key={b.businessId} value={b.businessId}>{b.businessName}</option>)}
+          </select>}
+          {sessionError && <p role="alert" className="mt-2 text-sm text-red-200">{sessionError}</p>}
         </div>
       )}
 
@@ -161,6 +185,7 @@ export const AppShell: React.FC = () => {
         </div>
         <button
           onClick={handleLogout}
+          disabled={sessionBusy}
           className="text-[#8FC4BC] hover:text-white transition-colors"
           aria-label="Sign out"
         >

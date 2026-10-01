@@ -1,3 +1,5 @@
+import { purchaseErrorMessage } from '../../lib/purchaseValidation';
+import { formatMoney } from '../../lib/formatMoney';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -52,7 +54,7 @@ export default function PurchaseList() {
   });
 
   const statusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: PurchaseStatus }) => purchaseApi.updateStatus(id, status),
+    mutationFn: ({ id, status, version }: { id: string; status: PurchaseStatus; version: number }) => purchaseApi.updateStatus(id, status, version),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: purchaseKeys.all });
     },
@@ -64,12 +66,13 @@ export default function PurchaseList() {
       return;
     }
     if (confirm('Are you sure you want to delete this purchase order?')) {
-      await deleteMutation.mutateAsync(id);
+      deleteMutation.mutate(id);
     }
   };
 
   return (
     <div className="space-y-6">
+      {(statusMutation.error || deleteMutation.error) && <p role="alert" className="rounded-lg bg-red-50 p-4 text-red-700">{purchaseErrorMessage(statusMutation.error || deleteMutation.error)}</p>}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -183,7 +186,7 @@ export default function PurchaseList() {
                         )}
                       </td>
                       <td className="py-3 px-4 text-right font-semibold text-slate-900">
-                        ${po.grandTotal.toFixed(2)}
+                        {formatMoney(po.grandTotal)}
                       </td>
                       <td className="py-3 px-4 text-slate-500 text-xs">
                         {new Date(po.createdAt).toLocaleDateString()}
@@ -198,7 +201,8 @@ export default function PurchaseList() {
                         </button>
                         {po.status === PurchaseStatus.Draft && (
                           <button
-                            onClick={() => statusMutation.mutate({ id: po.id, status: PurchaseStatus.Confirmed })}
+                            disabled={statusMutation.isPending}
+                            onClick={() => statusMutation.mutate({ id: po.id, status: PurchaseStatus.Confirmed, version: po.version })}
                             title="Confirm Order"
                             className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors inline-block"
                           >
@@ -207,7 +211,8 @@ export default function PurchaseList() {
                         )}
                         {po.status === PurchaseStatus.Confirmed && (
                           <button
-                            onClick={() => statusMutation.mutate({ id: po.id, status: PurchaseStatus.Dispatched })}
+                            disabled={statusMutation.isPending}
+                            onClick={() => statusMutation.mutate({ id: po.id, status: PurchaseStatus.Dispatched, version: po.version })}
                             title="Mark Dispatched"
                             className="p-1.5 text-slate-600 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors inline-block"
                           >

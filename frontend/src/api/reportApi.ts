@@ -23,6 +23,7 @@ export interface StockAnalyticsDto {
   lowStockCount: number;
   outOfStockCount: number;
   estimatedInventoryValue: number;
+  unpricedStockItemCount: number;
   totalMovementsCount: number;
 }
 

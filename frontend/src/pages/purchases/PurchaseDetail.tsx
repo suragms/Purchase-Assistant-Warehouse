@@ -1,8 +1,13 @@
+import { formatMoney } from '../../lib/formatMoney';
+import PurchasePayment from './PurchasePayment';
+import DamageReportSection from '../../components/damage/DamageReportSection';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { purchaseApi, PurchaseStatus, DeliveryState, type ReceivePurchaseDto } from '../../api/purchaseApi';
-import { purchaseKeys } from '../../lib/queryKeys';
+import { purchaseErrorMessage } from '../../lib/purchaseValidation';
+import { useAuthStore } from '../../stores/authStore';
+import { purchaseKeys, stockKeys, catalogKeys, dashboardKeys, reportKeys, notificationKeys } from '../../lib/queryKeys';
 import {
   ArrowLeft,
   CheckCircle,
@@ -17,7 +22,10 @@ export default function PurchaseDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const business = useAuthStore(state => state.user?.currentBusiness);
+  const can = (permission: string) => business?.role === 'Owner' || business?.role === 'SuperAdmin' || !!business?.permissions.includes(permission);
 
+  const [success, setSuccess] = useState('');
   const [receiveQuantities, setReceiveQuantities] = useState<Record<string, number>>({});
   const [receiveNotes] = useState<Record<string, string>>({});
 
@@ -28,20 +36,24 @@ export default function PurchaseDetail() {
   });
 
   const statusMutation = useMutation({
-    mutationFn: (status: PurchaseStatus) => purchaseApi.updateStatus(id!, status),
+    mutationFn: (status: PurchaseStatus) => purchaseApi.updateStatus(id!, status, order!.version),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: purchaseKeys.all });
-      queryClient.invalidateQueries({ queryKey: purchaseKeys.detail(id!) });
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+      queryClient.invalidateQueries({ queryKey: reportKeys.all });
     },
   });
+
+  const activity = useQuery({ queryKey: [...purchaseKeys.detail(id!), 'activity'], queryFn: () => purchaseApi.getActivity(id!), enabled: !!order });
 
   const receiveMutation = useMutation({
     mutationFn: (dto: ReceivePurchaseDto) => purchaseApi.receiveItems(id!, dto),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: purchaseKeys.all });
-      queryClient.invalidateQueries({ queryKey: purchaseKeys.detail(id!) });
-      queryClient.invalidateQueries({ queryKey: ['stock'] });
-      alert('Items successfully received and stock adjusted via StockService!');
+      for (const key of [stockKeys.all, catalogKeys.all, dashboardKeys.all, reportKeys.all, notificationKeys.all, ['barcode']])
+        queryClient.invalidateQueries({ queryKey: key });
+      setReceiveQuantities({});
+      setSuccess('Received quantities saved.');
     },
   });
 
@@ -51,7 +63,7 @@ export default function PurchaseDetail() {
 
   const handleReceiveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!order) return;
+    if (!order || receiveMutation.isPending) return;
 
     const itemsToReceive = order.items.map(item => {
       const delta = receiveQuantities[item.id] || 0;
@@ -67,7 +79,7 @@ export default function PurchaseDetail() {
       return;
     }
 
-    await receiveMutation.mutateAsync({ items: itemsToReceive });
+    receiveMutation.mutate({ items: itemsToReceive, expectedVersion: order.version });
   };
 
   if (isLoading) return <div className="p-8 text-center text-slate-500">Loading purchase order details...</div>;
@@ -78,6 +90,7 @@ export default function PurchaseDetail() {
     { status: PurchaseStatus.Confirmed, label: 'Confirmed' },
     { status: PurchaseStatus.Dispatched, label: 'Dispatched' },
     { status: PurchaseStatus.Arrived, label: 'Arrived' },
+    { status: PurchaseStatus.Verified, label: 'Verified' },
     { status: PurchaseStatus.Completed, label: 'Completed' },
   ];
 
@@ -108,7 +121,7 @@ export default function PurchaseDetail() {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
-          {order.status === PurchaseStatus.Draft && (
+          {order.status === PurchaseStatus.Draft && can('purchase.edit') && (
             <>
               <button
                 onClick={() => navigate(`/purchases/${order.id}/edit`)}
@@ -117,6 +130,7 @@ export default function PurchaseDetail() {
                 Edit Draft
               </button>
               <button
+                disabled={statusMutation.isPending}
                 onClick={() => statusMutation.mutate(PurchaseStatus.Confirmed)}
                 className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-sm transition-colors"
               >
@@ -125,21 +139,32 @@ export default function PurchaseDetail() {
             </>
           )}
 
-          {order.status === PurchaseStatus.Confirmed && (
+          {order.status === PurchaseStatus.Confirmed && can('purchase.delivery') && (
             <button
-              onClick={() => statusMutation.mutate(PurchaseStatus.Dispatched)}
+              disabled={statusMutation.isPending}
+                onClick={() => statusMutation.mutate(PurchaseStatus.Dispatched)}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg shadow-sm transition-colors"
             >
               <Truck className="w-4 h-4" /> Mark Dispatched
             </button>
           )}
+          {order.status === PurchaseStatus.Dispatched && can('purchase.delivery') && (
+            <button disabled={statusMutation.isPending} onClick={() => statusMutation.mutate(PurchaseStatus.Arrived)}
+              className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg disabled:opacity-50">Mark Arrived</button>
+          )}
+          {order.status === PurchaseStatus.Arrived && can('purchase.verify') && (
+            <button disabled={statusMutation.isPending} onClick={() => statusMutation.mutate(PurchaseStatus.Verified)}
+              className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg disabled:opacity-50">Verify Delivery</button>
+          )}
         </div>
       </div>
 
+      {(statusMutation.error || receiveMutation.error) && <p role="alert" className="rounded-lg bg-red-50 p-4 text-red-700">{purchaseErrorMessage(statusMutation.error || receiveMutation.error)}</p>}
+      {success && <p role="status" className="text-emerald-700">{success}</p>}
       {/* Lifecycle Progress Stepper */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
         <h3 className="text-sm font-semibold text-slate-900 mb-4">Lifecycle State</h3>
-        <div className="grid grid-cols-5 gap-2 text-center">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-center">
           {steps.map((step, idx) => {
             const isPassed = order.status >= step.status && order.status !== PurchaseStatus.Cancelled;
             const isCurrent = order.status === step.status;
@@ -160,6 +185,7 @@ export default function PurchaseDetail() {
         </div>
       </div>
 
+      {order.verifiedAt && <p className="text-sm text-slate-600">Delivery verified on {new Date(order.verifiedAt).toLocaleString()}.</p>}
       {/* Info Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-3">
@@ -215,7 +241,7 @@ export default function PurchaseDetail() {
                   <th className="py-3 px-4 text-right">Received</th>
                   <th className="py-3 px-4 text-right">Unit Price</th>
                   <th className="py-3 px-4 text-right">Line Total</th>
-                  {(order.status === PurchaseStatus.Dispatched || order.status === PurchaseStatus.Arrived) && (
+                  {(order.status === PurchaseStatus.Verified && can('purchase.commit') && can('purchase.verify')) && (
                     <th className="py-3 px-4 bg-indigo-50/50 text-indigo-900 text-right">Receive Now (Delta)</th>
                   )}
                 </tr>
@@ -229,12 +255,13 @@ export default function PurchaseDetail() {
                     </td>
                     <td className="py-3 px-4 text-right font-medium text-slate-900">{item.orderedQuantity}</td>
                     <td className="py-3 px-4 text-right font-semibold text-emerald-600">{item.receivedQuantity}</td>
-                    <td className="py-3 px-4 text-right text-slate-700">${item.unitPrice.toFixed(2)}</td>
-                    <td className="py-3 px-4 text-right font-semibold text-slate-900">${item.lineTotal.toFixed(2)}</td>
-                    {(order.status === PurchaseStatus.Dispatched || order.status === PurchaseStatus.Arrived) && (
+                    <td className="py-3 px-4 text-right text-slate-700">{formatMoney(item.unitPrice)}</td>
+                    <td className="py-3 px-4 text-right font-semibold text-slate-900">{formatMoney(item.lineTotal)}</td>
+                    {(order.status === PurchaseStatus.Verified && can('purchase.commit') && can('purchase.verify')) && (
                       <td className="py-3 px-4 bg-indigo-50/30 text-right">
                         <input
                           type="number"
+                          aria-label={`Receive quantity for ${item.catalogItemName}`}
                           min="0"
                           max={item.orderedQuantity - item.receivedQuantity}
                           step="any"
@@ -254,12 +281,12 @@ export default function PurchaseDetail() {
           {/* Totals & Submit Receive Action */}
           <div className="p-6 bg-slate-50 border-t border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="space-y-1 text-sm text-slate-600">
-              <div>Subtotal: <span className="font-semibold text-slate-900">${order.subtotal.toFixed(2)}</span></div>
-              <div>Tax: <span className="font-semibold text-slate-900">${order.taxTotal.toFixed(2)}</span></div>
-              <div className="text-base font-bold text-slate-900">Grand Total: <span className="text-indigo-600">${order.grandTotal.toFixed(2)}</span></div>
+              <div>Subtotal: <span className="font-semibold text-slate-900">{formatMoney(order.subtotal)}</span></div>
+              <div>Tax: <span className="font-semibold text-slate-900">{formatMoney(order.taxTotal)}</span></div>
+              <div className="text-base font-bold text-slate-900">Grand Total: <span className="text-indigo-600">{formatMoney(order.grandTotal)}</span></div>
             </div>
 
-            {(order.status === PurchaseStatus.Dispatched || order.status === PurchaseStatus.Arrived) && (
+            {(order.status === PurchaseStatus.Verified && can('purchase.commit') && can('purchase.verify')) && (
               <button
                 type="submit"
                 disabled={receiveMutation.isPending}
@@ -272,6 +299,24 @@ export default function PurchaseDetail() {
           </div>
         </form>
       </div>
+
+      {/* Damage Reports Section */}
+      {order.status >= PurchaseStatus.Arrived && (
+        <DamageReportSection
+          purchaseOrderId={order.id}
+          orderItems={order.items}
+        />
+      )}
+
+      <PurchasePayment order={order} />
+      <section className="bg-white p-5 rounded-xl border border-slate-200 space-y-3" aria-label="Purchase activity">
+        <h2 className="font-semibold text-slate-900">Purchase activity</h2>
+        {activity.isLoading ? <p className="text-sm text-slate-500">Loading activity…</p> : activity.error ?
+          <p role="alert" className="text-sm text-red-700">{purchaseErrorMessage(activity.error)}</p> :
+          <ul className="space-y-2 text-sm text-slate-600">{activity.data?.length ? activity.data.map(event =>
+            <li key={event.id}>{event.eventType.replace(/^Purchase/, '').replace(/([a-z])([A-Z])/g, '$1 $2')} · {new Date(event.createdAt).toLocaleString()}</li>) :
+            <li>No recorded activity yet.</li>}</ul>}
+      </section>
     </div>
   );
 }

@@ -25,6 +25,8 @@ namespace PurchaseAssistant.Domain.Constants
         public const string PurchaseDelivery = "purchase.delivery";
         public const string PurchaseVerify = "purchase.verify";
         public const string PurchaseCommit = "purchase.commit";
+        public const string PurchaseDamageReport = "purchase.damage_report";
+        public const string PurchaseDamageApprove = "purchase.damage_approve";
 
         public const string StockView = "stock.view";
         public const string StockAdjust = "stock.adjust";
@@ -37,5 +39,17 @@ namespace PurchaseAssistant.Domain.Constants
         public const string RolesManage = "roles.manage";
         public const string SettingsManage = "settings.manage";
         public const string ProvidersManage = "providers.manage";
+
+        // Preserve the target role matrix; an explicit membership permission array remains an override.
+        public static string[] ForRole(Enums.Role role) => role switch
+        {
+            Enums.Role.Owner or Enums.Role.Admin or Enums.Role.SuperAdmin => typeof(Permissions).GetFields()
+                .Where(f => f.IsLiteral && f.FieldType == typeof(string)).Select(f => (string)f.GetRawConstantValue()!).ToArray(),
+            Enums.Role.Manager => [CatalogView, CatalogCreate, CatalogEdit, SupplierView, SupplierCreate, SupplierEdit,
+                BrokerView, BrokerCreate, BrokerEdit, PurchaseView, PurchaseCreate, PurchaseEdit, PurchaseDelivery,
+                PurchaseVerify, PurchaseCommit, PurchaseDamageReport, PurchaseDamageApprove, StockView, StockAdjust, StockPhysical, StockSystem, ReportsView],
+            Enums.Role.Staff => [CatalogView, SupplierView, BrokerView, PurchaseView, PurchaseVerify, PurchaseDamageReport, StockView, StockPhysical],
+            _ => []
+        };
     }
 }

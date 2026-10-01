@@ -1,3 +1,4 @@
+using PurchaseAssistant.Application.DTOs;
 using System.Text.Json.Serialization;
 
 namespace PurchaseAssistant.Application.DTOs.Purchase;
@@ -25,7 +26,7 @@ public record PurchaseIntentItemCandidateDto(
     Guid? CatalogItemId,
     string? ItemCode,
     string? CatalogItemName,
-    decimal RequestedQuantity,
+    [property: OperationalNumeric] decimal RequestedQuantity,
     string? UnitOfMeasure,
     bool IsAmbiguous,
     List<CatalogItemOptionDto>? Options

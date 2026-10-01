@@ -11,6 +11,8 @@ namespace PurchaseAssistant.Domain.Entities
         public string? Barcode { get; set; }
         public string? AttributesJson { get; set; }
         public bool IsActive { get; set; } = true;
+        public decimal? KgPerUnit { get; set; }
+        public Guid RowVersion { get; set; } = Guid.NewGuid();
     }
 
     public class SupplierItem : TenantEntity

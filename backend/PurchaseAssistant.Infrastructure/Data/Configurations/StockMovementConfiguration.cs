@@ -24,7 +24,7 @@ namespace PurchaseAssistant.Infrastructure.Data.Configurations
             builder.HasOne(e => e.CatalogItem)
                 .WithMany()
                 .HasForeignKey(e => e.CatalogItemId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.HasOne(e => e.CreatedBy)
                 .WithMany()

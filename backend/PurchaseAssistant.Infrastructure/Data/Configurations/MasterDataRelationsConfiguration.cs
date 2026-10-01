@@ -10,6 +10,10 @@ namespace PurchaseAssistant.Infrastructure.Data.Configurations
         {
             builder.HasKey(x => x.Id);
             builder.Property(x => x.Name).IsRequired().HasMaxLength(150);
+            builder.Property(x => x.KgPerUnit).HasPrecision(18, 4);
+            builder.Property(x => x.RowVersion).IsConcurrencyToken().HasDefaultValueSql("gen_random_uuid()");
+            builder.Property<string>("NormalizedName").HasComputedColumnSql("lower(btrim(\"Name\"))", stored: true);
+            builder.HasIndex("BusinessId", "CatalogItemId", "NormalizedName").IsUnique();
             builder.HasIndex(x => new { x.BusinessId, x.CatalogItemId });
         }
     }

@@ -6,6 +6,8 @@ import { catalogApi } from '../../api/catalogApi';
 import { catalogKeys } from '../../lib/queryKeys';
 import { PageHeader, Button, Card, Badge, Skeleton, ErrorState, ConfirmDialog } from '../../components/ui';
 import { useToast } from '../../components/ui/ToastProvider';
+import { PermissionGate } from '../../auth/Guards';
+import CatalogVariants from './CatalogVariants';
 
 export default function CatalogDetail() {
   const { id } = useParams<{ id: string }>();
@@ -20,9 +22,10 @@ export default function CatalogDetail() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => catalogApi.deleteItem(id!),
+    mutationFn: () => catalogApi.archiveItem(id!, item!.rowVersion),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: catalogKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: catalogKeys.detail(id!) });
       queryClient.invalidateQueries({ queryKey: ['search'] });
       showToast('Item archived successfully', 'success');
       navigate('/catalog/items');
@@ -55,12 +58,12 @@ export default function CatalogDetail() {
         subtitle={`Item Code: ${item.itemCode}`}
         actions={
           <>
-            <Link to={`/catalog/items/${item.id}/edit`}>
+            <PermissionGate permission="catalog.edit"><Link to={`/catalog/items/${item.id}/edit`}>
               <Button variant="secondary" icon={<Edit className="h-4 w-4" />}>Edit</Button>
-            </Link>
-            <Button variant="danger" icon={<Archive className="h-4 w-4" />} onClick={() => setDeleteOpen(true)}>
+            </Link></PermissionGate>
+            {item.isActive && <PermissionGate permission="catalog.archive"><Button variant="danger" icon={<Archive className="h-4 w-4" />} onClick={() => setDeleteOpen(true)}>
               Archive
-            </Button>
+            </Button></PermissionGate>}
           </>
         }
       />
@@ -111,14 +114,7 @@ export default function CatalogDetail() {
             </dl>
           </Card>
 
-          {/* Missing Backend Feature Handlers */}
-          <Card className="p-6">
-            <h3 className="text-lg font-medium text-[#0F172A] border-b pb-2 mb-4">Variants</h3>
-            <div className="flex flex-col items-center justify-center py-6 bg-gray-50 rounded border border-dashed border-gray-300">
-              <AlertCircle className="h-6 w-6 text-gray-400 mb-2" />
-              <p className="text-sm text-gray-500 text-center">Variants API endpoint not implemented yet.</p>
-            </div>
-          </Card>
+          <CatalogVariants itemId={item.id} variants={item.variants} />
 
           <Card className="p-6">
             <h3 className="text-lg font-medium text-[#0F172A] border-b pb-2 mb-4">Purchase History</h3>
@@ -130,7 +126,7 @@ export default function CatalogDetail() {
 
         <div className="space-y-6">
           <Card className="p-6 bg-[#0E4F46] text-white">
-            <h3 className="text-sm font-medium text-[#B8D4CF] mb-1">Current Physical Stock</h3>
+            <h3 className="text-sm font-medium text-[#B8D4CF] mb-1">Current System Stock</h3>
             <div className="text-4xl font-bold">
               {item.currentStock.toLocaleString(undefined, { maximumFractionDigits: 2 })}
               <span className="text-xl font-normal ml-2 text-[#8FC4BC]">{item.defaultUnit}</span>

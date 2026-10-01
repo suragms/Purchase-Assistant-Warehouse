@@ -45,13 +45,15 @@ public class PurchaseParsingServiceTests
     [Fact]
     public async Task ParseAsync_ResolvesItem_WhenExactMatchFound()
     {
-        var jsonResponse = @"{""Status"": ""Success"", ""Items"": [{""CatalogItemName"": ""Rice"", ""RequestedQuantity"": 10}]}";
+        var jsonResponse = @"{""Status"": ""Success"", ""SupplierName"": ""Supplier"", ""Items"": [{""CatalogItemName"": ""Rice"", ""RequestedQuantity"": 10}]}";
         _mockRoutingService.Setup(r => r.ExecuteWithFailoverAsync(It.IsAny<AIRequest>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AIResponse(true, jsonResponse, null, "Provider", "Model", 0));
 
         _mockCatalogService.Setup(c => c.GetAllAsync(1, 50, "Rice", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PaginatedResult<CatalogItemDto> { Data = new List<CatalogItemDto> { new CatalogItemDto { Id = Guid.NewGuid(), Name = "Rice" } } });
 
+        _mockSupplierService.Setup(s => s.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<SupplierDto> { new() { Id = Guid.NewGuid(), Name = "Supplier" } });
         var result = await _service.ParseAsync("Buy rice");
 
         Assert.Equal(IntentStatus.Success, result.Status);

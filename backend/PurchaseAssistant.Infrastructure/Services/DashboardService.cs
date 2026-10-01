@@ -45,7 +45,7 @@ namespace PurchaseAssistant.Infrastructure.Services
                 .CountAsync();
 
             dto.PurchaseMetrics.TotalPurchaseSpend = await purchasesQuery
-                .Where(p => p.Status != PurchaseStatus.Cancelled)
+                .Where(p => p.Status != PurchaseStatus.Cancelled && p.Status != PurchaseStatus.Draft)
                 .SumAsync(p => p.GrandTotal);
 
             // Stock Metrics
@@ -53,10 +53,10 @@ namespace PurchaseAssistant.Infrastructure.Services
 
             dto.StockMetrics.TotalCatalogItems = await itemsQuery.CountAsync();
             dto.StockMetrics.LowStockCount = await itemsQuery
-                .Where(i => i.CurrentStock <= i.ReorderLevel && i.CurrentStock > 0)
+                .Where(i => i.CurrentStock - i.ReservedStock <= i.ReorderLevel && i.CurrentStock - i.ReservedStock > 0)
                 .CountAsync();
             dto.StockMetrics.OutOfStockCount = await itemsQuery
-                .Where(i => i.CurrentStock <= 0)
+                .Where(i => i.CurrentStock - i.ReservedStock <= 0)
                 .CountAsync();
 
             dto.StockMetrics.ItermsWithPhysicalVariance = await itemsQuery

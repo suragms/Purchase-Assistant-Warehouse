@@ -5,7 +5,7 @@ namespace PurchaseAssistant.Contracts.Responses
         public T? Data { get; set; }
         public object? Meta { get; set; }
         
-        public ApiResponse(T data, object? meta = null)
+        public ApiResponse(T? data, object? meta = null)
         {
             Data = data;
             Meta = meta;

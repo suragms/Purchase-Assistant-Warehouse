@@ -22,28 +22,27 @@ public class GeminiProvider : IAIProvider
         var startTime = DateTime.UtcNow;
         try
         {
-            // Gemini API call logic here
-            // Note: I will use a dummy endpoint for now based on the prompt instructions to keep it simple and safe.
             var payload = new
             {
+                systemInstruction = new { parts = new[] { new { text = request.SystemPrompt ?? "Extract purchase intent as JSON." } } },
                 contents = new[]
                 {
                     new { parts = new[] { new { text = request.Prompt } } }
                 }
             };
 
-            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + _apiKey);
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent");
+            httpRequest.Headers.Add("x-goog-api-key", _apiKey);
             httpRequest.Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(payload), System.Text.Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(httpRequest, ct);
+            using var response = await _httpClient.SendAsync(httpRequest, ct);
             response.EnsureSuccessStatusCode();
 
-            var data = await response.Content.ReadFromJsonAsync<dynamic>(cancellationToken: ct);
-            // Simplified parsing for brevity
-            string? content = data?.candidates[0].content.parts[0].text;
+            using var data = await System.Text.Json.JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+            string? content = data.RootElement.GetProperty("candidates")[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString();
 
             return new AIResponse(
-                Success: true,
+                Success: !string.IsNullOrWhiteSpace(content),
                 Content: content,
                 Error: null,
                 Provider: ProviderType.ToString(),
@@ -51,12 +50,13 @@ public class GeminiProvider : IAIProvider
                 LatencyMs: (decimal)(DateTime.UtcNow - startTime).TotalMilliseconds
             );
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception)
         {
             return new AIResponse(
                 Success: false,
                 Content: null,
-                Error: ex.Message,
+                Error: "AI_PROVIDER_FAILED",
                 Provider: ProviderType.ToString(),
                 ModelUsed: "gemini-1.5-flash",
                 LatencyMs: (decimal)(DateTime.UtcNow - startTime).TotalMilliseconds

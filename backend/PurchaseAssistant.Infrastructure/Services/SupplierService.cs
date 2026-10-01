@@ -21,31 +21,19 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<List<SupplierDto>> GetAllAsync(CancellationToken cancellationToken = default)
         {
-            var suppliers = await _context.Suppliers
+            return await _context.Suppliers.AsNoTracking()
                 .OrderBy(s => s.Name)
-                .ToListAsync(cancellationToken);
-
-            var result = new List<SupplierDto>();
-            foreach (var sup in suppliers)
-            {
-                var count = await _context.SupplierItems.CountAsync(i => i.SupplierId == sup.Id, cancellationToken);
-                result.Add(new SupplierDto
+                .Select(s => new SupplierDto
                 {
-                    Id = sup.Id,
-                    Name = sup.Name,
-                    Phone = sup.Phone,
-                    Address = sup.Address,
-                    Notes = sup.Notes,
-                    IsActive = sup.IsActive,
-                    LinkedItemsCount = count
-                });
-            }
-            return result;
+                    Id = s.Id, Name = s.Name, Phone = s.Phone, Address = s.Address,
+                    Notes = s.Notes, IsActive = s.IsActive,
+                    LinkedItemsCount = _context.SupplierItems.Count(i => i.SupplierId == s.Id)
+                }).ToListAsync(cancellationToken);
         }
 
         public async Task<SupplierDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         {
-            var sup = await _context.Suppliers.FindAsync(new object[] { id }, cancellationToken);
+            var sup = await _context.Suppliers.FirstOrDefaultAsync(x => x.Id == id && x.BusinessId == _currentUser.BusinessId, cancellationToken);
             if (sup == null) return null;
 
             var count = await _context.SupplierItems.CountAsync(i => i.SupplierId == sup.Id, cancellationToken);
@@ -102,7 +90,7 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<SupplierDto> UpdateAsync(Guid id, SupplierDto dto, CancellationToken cancellationToken = default)
         {
-            var supplier = await _context.Suppliers.FindAsync(new object[] { id }, cancellationToken);
+            var supplier = await _context.Suppliers.FirstOrDefaultAsync(x => x.Id == id && x.BusinessId == _currentUser.BusinessId, cancellationToken);
             if (supplier == null) throw new KeyNotFoundException("SUPPLIER_NOT_FOUND");
 
             supplier.Name = dto.Name.Trim();
@@ -129,7 +117,7 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
         {
-            var supplier = await _context.Suppliers.FindAsync(new object[] { id }, cancellationToken);
+            var supplier = await _context.Suppliers.FirstOrDefaultAsync(x => x.Id == id && x.BusinessId == _currentUser.BusinessId, cancellationToken);
             if (supplier == null) throw new KeyNotFoundException("SUPPLIER_NOT_FOUND");
 
             // Check if in use in purchase orders (for now just check supplier items or let relational integrity handle)

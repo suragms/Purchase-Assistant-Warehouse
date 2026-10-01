@@ -76,9 +76,7 @@ namespace PurchaseAssistant.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BrokerId");
-
-                    b.HasIndex("SupplierId");
+                    b.HasIndex("BusinessId", "SupplierId");
 
                     b.HasIndex("BusinessId", "BrokerId", "SupplierId")
                         .IsUnique();
@@ -184,20 +182,18 @@ namespace PurchaseAssistant.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CategoryId");
-
-                    b.HasIndex("LastBrokerId");
-
-                    b.HasIndex("LastSupplierId");
-
-                    b.HasIndex("TypeId");
-
                     b.HasIndex("BusinessId", "Barcode")
                         .IsUnique()
                         .HasFilter("\"Barcode\" IS NOT NULL");
 
                     b.HasIndex("BusinessId", "ItemCode")
                         .IsUnique();
+
+                    b.HasIndex("BusinessId", "LastBrokerId");
+
+                    b.HasIndex("BusinessId", "LastSupplierId");
+
+                    b.HasIndex("BusinessId", "CategoryId", "TypeId");
 
                     b.ToTable("CatalogItems");
                 });
@@ -229,19 +225,35 @@ namespace PurchaseAssistant.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<decimal?>("KgPerUnit")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
+
+                    b.Property<string>("NormalizedName")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasComputedColumnSql("lower(btrim(\"Name\"))", true);
+
+                    b.Property<Guid>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CatalogItemId");
-
                     b.HasIndex("BusinessId", "CatalogItemId");
+
+                    b.HasIndex("BusinessId", "CatalogItemId", "NormalizedName")
+                        .IsUnique();
 
                     b.ToTable("CatalogVariants");
                 });
@@ -293,8 +305,6 @@ namespace PurchaseAssistant.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("CategoryId");
 
                     b.ToTable("CategoryTypes");
                 });
@@ -390,6 +400,78 @@ namespace PurchaseAssistant.Infrastructure.Migrations
                     b.ToTable("Notifications");
                 });
 
+            modelBuilder.Entity("PurchaseAssistant.Domain.Entities.PurchaseDamageReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CatalogItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DamageType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ItemName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PhotoUrl")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("PurchaseOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("QtyDamaged")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("ReportedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReportedByUserId");
+
+                    b.HasIndex("BusinessId", "CatalogItemId");
+
+                    b.HasIndex("BusinessId", "PurchaseOrderId");
+
+                    b.HasIndex("BusinessId", "Status");
+
+                    b.HasIndex("BusinessId", "PurchaseOrderId", "CreatedAt");
+
+                    b.ToTable("PurchaseDamageReports");
+                });
+
             modelBuilder.Entity("PurchaseAssistant.Domain.Entities.PurchaseItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -404,6 +486,18 @@ namespace PurchaseAssistant.Infrastructure.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("DiscountPercent")
+                        .HasPrecision(6, 2)
+                        .HasColumnType("numeric(6,2)");
+
+                    b.Property<decimal?>("KgPerUnit")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal?>("LandingCostPerKg")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
 
                     b.Property<decimal>("LineTotal")
                         .HasPrecision(18, 4)
@@ -424,6 +518,10 @@ namespace PurchaseAssistant.Infrastructure.Migrations
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
 
+                    b.Property<decimal>("TaxPercent")
+                        .HasPrecision(6, 2)
+                        .HasColumnType("numeric(6,2)");
+
                     b.Property<decimal>("UnitPrice")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
@@ -433,9 +531,7 @@ namespace PurchaseAssistant.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CatalogItemId");
-
-                    b.HasIndex("PurchaseOrderId");
+                    b.HasIndex("BusinessId", "CatalogItemId");
 
                     b.HasIndex("BusinessId", "PurchaseOrderId");
 
@@ -485,6 +581,16 @@ namespace PurchaseAssistant.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<decimal>("PaidAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("PaymentDays")
+                        .HasColumnType("integer");
+
                     b.Property<int>("PaymentState")
                         .HasColumnType("integer");
 
@@ -505,16 +611,28 @@ namespace PurchaseAssistant.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("VerifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("VerifiedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("BrokerId");
-
-                    b.HasIndex("SupplierId");
+                    b.HasIndex("BusinessId", "BrokerId");
 
                     b.HasIndex("BusinessId", "OrderNumber")
                         .IsUnique();
 
                     b.HasIndex("BusinessId", "Status");
+
+                    b.HasIndex("BusinessId", "SupplierId");
 
                     b.ToTable("Purchases");
                 });
@@ -534,14 +652,24 @@ namespace PurchaseAssistant.Infrastructure.Migrations
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("FamilyId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
                     b.Property<Guid?>("ReplacedByTokenId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime?>("RevokedAt")
+                        .IsConcurrencyToken()
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("RevokedByIp")
                         .HasColumnType("text");
+
+                    b.Property<string>("TokenDigest")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<string>("TokenHash")
                         .IsRequired()
@@ -557,6 +685,11 @@ namespace PurchaseAssistant.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "TokenDigest")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "FamilyId", "RevokedAt");
 
                     b.ToTable("RefreshTokens");
                 });
@@ -660,8 +793,6 @@ namespace PurchaseAssistant.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CatalogItemId");
-
                     b.HasIndex("CreatedById");
 
                     b.HasIndex("BusinessId", "CatalogItemId", "CreatedAt");
@@ -741,9 +872,7 @@ namespace PurchaseAssistant.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CatalogItemId");
-
-                    b.HasIndex("SupplierId");
+                    b.HasIndex("BusinessId", "CatalogItemId");
 
                     b.HasIndex("BusinessId", "SupplierId", "CatalogItemId")
                         .IsUnique();
@@ -792,9 +921,9 @@ namespace PurchaseAssistant.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CatalogItemId");
+                    b.HasIndex("BusinessId", "CatalogItemId");
 
-                    b.HasIndex("SupplierId");
+                    b.HasIndex("BusinessId", "SourcePurchaseId");
 
                     b.HasIndex("BusinessId", "SupplierId", "CatalogItemId");
 
@@ -848,14 +977,16 @@ namespace PurchaseAssistant.Infrastructure.Migrations
                 {
                     b.HasOne("PurchaseAssistant.Domain.Entities.Broker", "Broker")
                         .WithMany()
-                        .HasForeignKey("BrokerId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasForeignKey("BusinessId", "BrokerId")
+                        .HasPrincipalKey("BusinessId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("PurchaseAssistant.Domain.Entities.Supplier", "Supplier")
                         .WithMany()
-                        .HasForeignKey("SupplierId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasForeignKey("BusinessId", "SupplierId")
+                        .HasPrincipalKey("BusinessId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Broker");
@@ -867,21 +998,28 @@ namespace PurchaseAssistant.Infrastructure.Migrations
                 {
                     b.HasOne("PurchaseAssistant.Domain.Entities.Category", "Category")
                         .WithMany()
-                        .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasForeignKey("BusinessId", "CategoryId")
+                        .HasPrincipalKey("BusinessId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("PurchaseAssistant.Domain.Entities.Broker", "LastBroker")
                         .WithMany()
-                        .HasForeignKey("LastBrokerId");
+                        .HasForeignKey("BusinessId", "LastBrokerId")
+                        .HasPrincipalKey("BusinessId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("PurchaseAssistant.Domain.Entities.Supplier", "LastSupplier")
                         .WithMany()
-                        .HasForeignKey("LastSupplierId");
+                        .HasForeignKey("BusinessId", "LastSupplierId")
+                        .HasPrincipalKey("BusinessId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("PurchaseAssistant.Domain.Entities.CategoryType", "Type")
                         .WithMany()
-                        .HasForeignKey("TypeId");
+                        .HasForeignKey("BusinessId", "CategoryId", "TypeId")
+                        .HasPrincipalKey("BusinessId", "CategoryId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Category");
 
@@ -896,8 +1034,9 @@ namespace PurchaseAssistant.Infrastructure.Migrations
                 {
                     b.HasOne("PurchaseAssistant.Domain.Entities.CatalogItem", "CatalogItem")
                         .WithMany()
-                        .HasForeignKey("CatalogItemId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasForeignKey("BusinessId", "CatalogItemId")
+                        .HasPrincipalKey("BusinessId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("CatalogItem");
@@ -907,8 +1046,9 @@ namespace PurchaseAssistant.Infrastructure.Migrations
                 {
                     b.HasOne("PurchaseAssistant.Domain.Entities.Category", "Category")
                         .WithMany()
-                        .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasForeignKey("BusinessId", "CategoryId")
+                        .HasPrincipalKey("BusinessId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Category");
@@ -933,17 +1073,46 @@ namespace PurchaseAssistant.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("PurchaseAssistant.Domain.Entities.PurchaseDamageReport", b =>
+                {
+                    b.HasOne("PurchaseAssistant.Domain.Entities.User", "ReportedByUser")
+                        .WithMany()
+                        .HasForeignKey("ReportedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PurchaseAssistant.Domain.Entities.CatalogItem", "CatalogItem")
+                        .WithMany()
+                        .HasForeignKey("BusinessId", "CatalogItemId")
+                        .HasPrincipalKey("BusinessId", "Id")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PurchaseAssistant.Domain.Entities.PurchaseOrder", "PurchaseOrder")
+                        .WithMany()
+                        .HasForeignKey("BusinessId", "PurchaseOrderId")
+                        .HasPrincipalKey("BusinessId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CatalogItem");
+
+                    b.Navigation("PurchaseOrder");
+
+                    b.Navigation("ReportedByUser");
+                });
+
             modelBuilder.Entity("PurchaseAssistant.Domain.Entities.PurchaseItem", b =>
                 {
                     b.HasOne("PurchaseAssistant.Domain.Entities.CatalogItem", "CatalogItem")
                         .WithMany()
-                        .HasForeignKey("CatalogItemId")
+                        .HasForeignKey("BusinessId", "CatalogItemId")
+                        .HasPrincipalKey("BusinessId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("PurchaseAssistant.Domain.Entities.PurchaseOrder", "PurchaseOrder")
                         .WithMany("Items")
-                        .HasForeignKey("PurchaseOrderId")
+                        .HasForeignKey("BusinessId", "PurchaseOrderId")
+                        .HasPrincipalKey("BusinessId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -956,12 +1125,14 @@ namespace PurchaseAssistant.Infrastructure.Migrations
                 {
                     b.HasOne("PurchaseAssistant.Domain.Entities.Broker", "Broker")
                         .WithMany()
-                        .HasForeignKey("BrokerId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .HasForeignKey("BusinessId", "BrokerId")
+                        .HasPrincipalKey("BusinessId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("PurchaseAssistant.Domain.Entities.Supplier", "Supplier")
                         .WithMany()
-                        .HasForeignKey("SupplierId")
+                        .HasForeignKey("BusinessId", "SupplierId")
+                        .HasPrincipalKey("BusinessId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -972,15 +1143,16 @@ namespace PurchaseAssistant.Infrastructure.Migrations
 
             modelBuilder.Entity("PurchaseAssistant.Domain.Entities.StockMovement", b =>
                 {
-                    b.HasOne("PurchaseAssistant.Domain.Entities.CatalogItem", "CatalogItem")
-                        .WithMany()
-                        .HasForeignKey("CatalogItemId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("PurchaseAssistant.Domain.Entities.User", "CreatedBy")
                         .WithMany()
                         .HasForeignKey("CreatedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PurchaseAssistant.Domain.Entities.CatalogItem", "CatalogItem")
+                        .WithMany()
+                        .HasForeignKey("BusinessId", "CatalogItemId")
+                        .HasPrincipalKey("BusinessId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -993,14 +1165,16 @@ namespace PurchaseAssistant.Infrastructure.Migrations
                 {
                     b.HasOne("PurchaseAssistant.Domain.Entities.CatalogItem", "CatalogItem")
                         .WithMany()
-                        .HasForeignKey("CatalogItemId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasForeignKey("BusinessId", "CatalogItemId")
+                        .HasPrincipalKey("BusinessId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("PurchaseAssistant.Domain.Entities.Supplier", "Supplier")
                         .WithMany()
-                        .HasForeignKey("SupplierId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasForeignKey("BusinessId", "SupplierId")
+                        .HasPrincipalKey("BusinessId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("CatalogItem");
@@ -1012,14 +1186,22 @@ namespace PurchaseAssistant.Infrastructure.Migrations
                 {
                     b.HasOne("PurchaseAssistant.Domain.Entities.CatalogItem", "CatalogItem")
                         .WithMany()
-                        .HasForeignKey("CatalogItemId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasForeignKey("BusinessId", "CatalogItemId")
+                        .HasPrincipalKey("BusinessId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("PurchaseAssistant.Domain.Entities.PurchaseOrder", null)
+                        .WithMany()
+                        .HasForeignKey("BusinessId", "SourcePurchaseId")
+                        .HasPrincipalKey("BusinessId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("PurchaseAssistant.Domain.Entities.Supplier", "Supplier")
                         .WithMany()
-                        .HasForeignKey("SupplierId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasForeignKey("BusinessId", "SupplierId")
+                        .HasPrincipalKey("BusinessId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("CatalogItem");

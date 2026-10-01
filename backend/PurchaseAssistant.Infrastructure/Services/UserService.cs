@@ -8,6 +8,8 @@ using PurchaseAssistant.Application.Interfaces;
 using PurchaseAssistant.Infrastructure.Data;
 using PurchaseAssistant.Domain.Entities;
 using BCrypt.Net;
+using System.Text.Json;
+using PurchaseAssistant.Domain.Constants;
 
 namespace PurchaseAssistant.Infrastructure.Services
 {
@@ -65,6 +67,7 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<UserDto> CreateUserAsync(CreateUserDto createUserDto)
         {
+            ValidateRole(createUserDto.Role);
             var businessId = _currentUser.BusinessId ?? Guid.Empty;
 
             // Check if user already exists globally by email
@@ -101,12 +104,18 @@ namespace PurchaseAssistant.Infrastructure.Services
                     Id = Guid.NewGuid(),
                     BusinessId = businessId,
                     UserId = user.Id,
-                    Role = createUserDto.Role
+                    Role = createUserDto.Role,
+                    PermissionsJson = JsonSerializer.Serialize(Permissions.ForRole(createUserDto.Role))
                 };
                 _context.Memberships.Add(membership);
             }
             else
             {
+                ValidateProtectedMembership(existingMembership);
+                if (user.Id == _currentUser.UserId && existingMembership.Role != createUserDto.Role)
+                    throw new UnauthorizedAccessException("You cannot change your own role.");
+                if (existingMembership.Role != createUserDto.Role)
+                    existingMembership.PermissionsJson = JsonSerializer.Serialize(Permissions.ForRole(createUserDto.Role));
                 existingMembership.Role = createUserDto.Role;
             }
 
@@ -132,9 +141,19 @@ namespace PurchaseAssistant.Infrastructure.Services
 
             if (membership == null) return false;
 
+            ValidateRole(updateUserDto.Role);
+            ValidateProtectedMembership(membership);
+            if (id == _currentUser.UserId && (membership.Role != updateUserDto.Role || membership.User.Status != updateUserDto.Status))
+                throw new UnauthorizedAccessException("You cannot change your own role or account status.");
+            if (await _context.Memberships.AnyAsync(m => m.UserId == id && m.BusinessId != businessId)
+                && (membership.User.Name != updateUserDto.Name || membership.User.Email != updateUserDto.Email || membership.User.Status != updateUserDto.Status))
+                throw new UnauthorizedAccessException("Shared account details cannot be changed from a single business.");
+
             membership.User.Name = updateUserDto.Name;
             membership.User.Email = updateUserDto.Email;
             membership.User.Status = updateUserDto.Status;
+            if (membership.Role != updateUserDto.Role)
+                membership.PermissionsJson = JsonSerializer.Serialize(Permissions.ForRole(updateUserDto.Role));
             membership.Role = updateUserDto.Role;
 
             await _context.SaveChangesAsync();
@@ -149,9 +168,27 @@ namespace PurchaseAssistant.Infrastructure.Services
 
             if (membership == null) return false;
 
+            ValidateProtectedMembership(membership);
+            if (id == _currentUser.UserId)
+                throw new UnauthorizedAccessException("You cannot remove your own business membership.");
+
             _context.Memberships.Remove(membership);
             await _context.SaveChangesAsync();
             return true;
+        }
+
+        private void ValidateRole(Domain.Enums.Role role)
+        {
+            if (!Enum.IsDefined(role) || role == Domain.Enums.Role.SuperAdmin)
+                throw new ArgumentException("This role cannot be assigned by business user management.");
+            if (role == Domain.Enums.Role.Owner && _currentUser.Role is not ("Owner" or "SuperAdmin"))
+                throw new UnauthorizedAccessException("Only an owner can assign an owner membership.");
+        }
+
+        private void ValidateProtectedMembership(Membership membership)
+        {
+            if (membership.Role == Domain.Enums.Role.SuperAdmin || membership.Role == Domain.Enums.Role.Owner && _currentUser.Role is not ("Owner" or "SuperAdmin"))
+                throw new UnauthorizedAccessException("You cannot modify this privileged membership.");
         }
     }
 }

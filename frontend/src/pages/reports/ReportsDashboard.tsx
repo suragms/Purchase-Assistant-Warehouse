@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { formatMoney } from '../../lib/formatMoney';
+import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { reportApi } from '../../api/reportApi';
 import { reportKeys } from '../../lib/queryKeys';
@@ -13,13 +14,12 @@ export default function ReportsDashboard() {
   const [dateRange, setDateRange] = useState<'30' | '90' | '365'>('30');
   const [groupBy, setGroupBy] = useState<'day' | 'month'>('day');
 
-  // Compute start and end dates
-  const endDateObj = new Date();
-  const startDateObj = new Date();
-  startDateObj.setDate(endDateObj.getDate() - parseInt(dateRange));
-
-  const startDate = startDateObj.toISOString().split('T')[0];
-  const endDate = endDateObj.toISOString().split('T')[0];
+  // Keep UTC bounds stable across renders while including today's activity.
+  const { startDate, endDate } = useMemo(() => {
+    const end = new Date(); const start = new Date(end);
+    start.setUTCDate(end.getUTCDate() - Number(dateRange));
+    return { startDate: start.toISOString(), endDate: end.toISOString() };
+  }, [dateRange]);
 
   const { data: spendData, isLoading: spendLoading } = useQuery({
     queryKey: reportKeys.spend({ startDate, endDate, groupBy }),
@@ -177,7 +177,7 @@ export default function ReportsDashboard() {
                       <td className="py-3.5 px-4 font-medium text-slate-900">{item.periodLabel}</td>
                       <td className="py-3.5 px-4 text-slate-600">{item.purchaseCount}</td>
                       <td className="py-3.5 px-4 text-right font-semibold text-indigo-600">
-                        ${item.totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {formatMoney(item.totalSpend)}
                       </td>
                     </tr>
                   ))}
@@ -211,7 +211,7 @@ export default function ReportsDashboard() {
                           <p className="text-xs text-slate-400">{item.count} orders</p>
                         </div>
                         <span className="font-bold text-indigo-600">
-                          ${item.totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          {formatMoney(item.totalSpend)}
                         </span>
                       </div>
                     ))}
@@ -233,7 +233,7 @@ export default function ReportsDashboard() {
                           <p className="text-xs text-slate-400">{item.count} orders</p>
                         </div>
                         <span className="font-bold text-indigo-600">
-                          ${item.totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          {formatMoney(item.totalSpend)}
                         </span>
                       </div>
                     ))}
@@ -320,7 +320,7 @@ function MetricCard({
 
   const formatVal = (val: number) =>
     isCurrency
-      ? `$${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      ? formatMoney(val)
       : val.toLocaleString();
 
   return (
@@ -337,8 +337,8 @@ function MetricCard({
               isGood ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
             }`}
           >
-            {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            {isPositive ? '+' : ''}{change}%
+            {Number.isFinite(change) && (isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />)}
+            {Number.isFinite(change) ? `${isPositive ? '+' : ''}${change}%` : 'Owner only'}
           </span>
           <span className="text-xs text-slate-400">vs prev period ({formatVal(previous)})</span>
         </div>

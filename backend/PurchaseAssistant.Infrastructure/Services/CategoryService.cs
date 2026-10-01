@@ -30,27 +30,19 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<List<CategoryDto>> GetAllAsync(CancellationToken cancellationToken = default)
         {
-            var categories = await _context.Categories
+            return await _context.Categories.AsNoTracking()
                 .OrderBy(c => c.Name)
-                .ToListAsync(cancellationToken);
-
-            var result = new List<CategoryDto>();
-            foreach (var cat in categories)
-            {
-                var count = await _context.CatalogItems.CountAsync(i => i.CategoryId == cat.Id, cancellationToken);
-                result.Add(new CategoryDto
+                .Select(cat => new CategoryDto
                 {
                     Id = cat.Id,
                     Name = cat.Name,
-                    ItemCount = count
-                });
-            }
-            return result;
+                    ItemCount = _context.CatalogItems.Count(i => i.CategoryId == cat.Id)
+                }).ToListAsync(cancellationToken);
         }
 
         public async Task<CategoryDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         {
-            var cat = await _context.Categories.FindAsync(new object[] { id }, cancellationToken);
+            var cat = await _context.Categories.FirstOrDefaultAsync(c => c.Id == id && c.BusinessId == _currentUser.BusinessId, cancellationToken);
             if (cat == null) return null;
 
             var count = await _context.CatalogItems.CountAsync(i => i.CategoryId == cat.Id, cancellationToken);
@@ -90,7 +82,7 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<CategoryDto> UpdateAsync(Guid id, string name, CancellationToken cancellationToken = default)
         {
-            var category = await _context.Categories.FindAsync(new object[] { id }, cancellationToken);
+            var category = await _context.Categories.FirstOrDefaultAsync(c => c.Id == id && c.BusinessId == _currentUser.BusinessId, cancellationToken);
             if (category == null) throw new KeyNotFoundException("CATEGORY_NOT_FOUND");
 
             category.Name = name.Trim();
@@ -104,7 +96,7 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
         {
-            var category = await _context.Categories.FindAsync(new object[] { id }, cancellationToken);
+            var category = await _context.Categories.FirstOrDefaultAsync(c => c.Id == id && c.BusinessId == _currentUser.BusinessId, cancellationToken);
             if (category == null) throw new KeyNotFoundException("CATEGORY_NOT_FOUND");
 
             var hasItems = await _context.CatalogItems.AnyAsync(i => i.CategoryId == id, cancellationToken);

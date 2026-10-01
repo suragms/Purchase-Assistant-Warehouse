@@ -36,7 +36,7 @@ export interface PurchaseIntentCandidateDto {
 
 export const purchaseIntentApi = {
   parseIntent: async (prompt: string): Promise<PurchaseIntentCandidateDto> => {
-    const res = await apiClient.post('/ai/purchase-intent/parse', { prompt });
+    const res = await apiClient.post('/ai/purchase-intent/parse', { prompt }, { timeout: 60000 });
     return res.data;
   },
 };
