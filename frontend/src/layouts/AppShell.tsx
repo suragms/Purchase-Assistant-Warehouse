@@ -161,7 +161,7 @@ export const AppShell: React.FC = () => {
       {/* Logo */}
       <div className="flex items-center gap-2 px-4 py-5 border-b border-white/10">
         <PackageOpen className="h-7 w-7 text-[#4ECDC4]" />
-        <span className="font-bold text-white text-lg leading-tight">Purchase<br />Assistant</span>
+        <span className="font-bold text-white text-base leading-tight">Warehouse Assistant<br /><span className="text-xs text-[#8FC4BC] font-normal">Harisree Agency</span></span>
       </div>
 
       {/* Business badge */}

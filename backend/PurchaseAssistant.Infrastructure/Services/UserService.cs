@@ -197,6 +197,66 @@ namespace PurchaseAssistant.Infrastructure.Services
             return true;
         }
 
+        public async Task<UserPermissionsDto?> GetPermissionsAsync(Guid userId)
+        {
+            RequireUserAdministrator();
+            var businessId = _currentUser.BusinessId ?? Guid.Empty;
+            var membership = await _context.Memberships
+                .AsNoTracking()
+                .FirstOrDefaultAsync(m => m.BusinessId == businessId && m.UserId == userId);
+
+            if (membership == null) return null;
+
+            var current = string.IsNullOrWhiteSpace(membership.PermissionsJson)
+                ? Permissions.ForRole(membership.Role)
+                : JsonSerializer.Deserialize<string[]>(membership.PermissionsJson) ?? Permissions.ForRole(membership.Role);
+
+            return new Application.DTOs.Users.UserPermissionsDto
+            {
+                Permissions = current.ToList(),
+                DefaultPermissions = Permissions.ForRole(membership.Role).ToList()
+            };
+        }
+
+        public async Task<bool> PatchPermissionsAsync(Guid userId, Application.DTOs.Users.PatchPermissionsDto patch)
+        {
+            RequireUserAdministrator();
+            var businessId = _currentUser.BusinessId ?? Guid.Empty;
+            var membership = await _context.Memberships
+                .FirstOrDefaultAsync(m => m.BusinessId == businessId && m.UserId == userId);
+
+            if (membership == null) return false;
+            ValidateProtectedMembership(membership);
+            if (userId == _currentUser.UserId)
+                throw new UnauthorizedAccessException("You cannot change your own permissions.");
+
+            var allKnown = typeof(Permissions).GetFields()
+                .Where(f => f.IsLiteral && f.FieldType == typeof(string))
+                .Select(f => (string)f.GetRawConstantValue()!)
+                .ToHashSet();
+
+            var current = string.IsNullOrWhiteSpace(membership.PermissionsJson)
+                ? Permissions.ForRole(membership.Role).ToHashSet()
+                : (JsonSerializer.Deserialize<string[]>(membership.PermissionsJson) ?? Permissions.ForRole(membership.Role)).ToHashSet();
+
+            foreach (var p in patch.Grant ?? [])
+            {
+                if (!allKnown.Contains(p))
+                    throw new ArgumentException($"Unknown permission: {p}");
+                current.Add(p);
+            }
+            foreach (var p in patch.Revoke ?? [])
+            {
+                if (!allKnown.Contains(p))
+                    throw new ArgumentException($"Unknown permission: {p}");
+                current.Remove(p);
+            }
+
+            membership.PermissionsJson = JsonSerializer.Serialize(current.ToArray());
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
         private void ValidateRole(Domain.Enums.Role role)
         {
             if (!Enum.IsDefined(role) || role == Domain.Enums.Role.SuperAdmin)

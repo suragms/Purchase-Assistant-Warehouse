@@ -12,5 +12,7 @@ namespace PurchaseAssistant.Application.Interfaces
         Task<UserDto> CreateUserAsync(CreateUserDto createUserDto);
         Task<bool> UpdateUserAsync(Guid id, UpdateUserDto updateUserDto);
         Task<bool> DeleteUserAsync(Guid id);
+        Task<UserPermissionsDto?> GetPermissionsAsync(Guid userId);
+        Task<bool> PatchPermissionsAsync(Guid userId, PatchPermissionsDto patch);
     }
 }

@@ -7,6 +7,7 @@ import { PageHeader } from '../../components/ui';
 import { useAuthStore } from '../../stores/authStore';
 import { purchaseErrorMessage } from '../../lib/purchaseValidation';
 import { USER_ROLES, USER_STATUSES } from '../../api/usersApi';
+import { PermissionEditor } from '../../components/users/PermissionEditor';
 
 export default function UsersPage() {
   const queryClient = useQueryClient();
@@ -17,6 +18,7 @@ export default function UsersPage() {
   const canEdit = (u: UserDto) => canManage && u.id !== user?.id && u.role !== 0 && (u.role !== 1 || role === 'Owner' || role === 'SuperAdmin');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserDto | null>(null);
+  const [editingPermissions, setEditingPermissions] = useState<UserDto | null>(null);
 
   // Form states
   const [formData, setFormData] = useState<CreateUserDto>({
@@ -162,6 +164,13 @@ export default function UsersPage() {
                     </td>
                     <td className="py-3.5 px-4 text-right space-x-2">
                       {canEdit(u) && <><button
+                        onClick={() => setEditingPermissions(u)}
+                        className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                        title="Edit Permissions"
+                      >
+                        <Shield className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => { updateMutation.reset(); setEditingUser(u); }}
                         className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
                         title="Edit User"
@@ -342,6 +351,15 @@ export default function UsersPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Permissions Editor */}
+      {editingPermissions && (
+        <PermissionEditor
+          userId={editingPermissions.id}
+          userName={editingPermissions.name}
+          onClose={() => setEditingPermissions(null)}
+        />
       )}
     </div>
   );

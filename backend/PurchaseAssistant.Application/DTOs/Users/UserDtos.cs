@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using PurchaseAssistant.Domain.Enums;
 using System.ComponentModel.DataAnnotations;
 
@@ -12,6 +13,20 @@ namespace PurchaseAssistant.Application.DTOs.Users
         public UserStatus Status { get; set; }
         public Role Role { get; set; }
         public DateTime CreatedAt { get; set; }
+    }
+
+    public class UserPermissionsDto
+    {
+        public List<string> Permissions { get; set; } = new();
+        public List<string> DefaultPermissions { get; set; } = new();
+    }
+
+    public class PatchPermissionsDto
+    {
+        /// <summary>Grant these permissions (add to set).</summary>
+        public List<string> Grant { get; set; } = new();
+        /// <summary>Revoke these permissions (remove from set).</summary>
+        public List<string> Revoke { get; set; } = new();
     }
 
     public class CreateUserDto

@@ -47,10 +47,10 @@ export const Login: React.FC = () => {
             <PackageOpen className="h-12 w-12 text-[#159A8A]" />
         </div>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-[#0F172A]">
-          Purchase Assistant
+          Warehouse Assistant
         </h2>
-        <p className="mt-2 text-center text-sm text-[#475569]">
-          Sign in to your account
+        <p className="mt-2 text-center text-lg text-[#475569]">
+          Harisree Agency
         </p>
       </div>
 
