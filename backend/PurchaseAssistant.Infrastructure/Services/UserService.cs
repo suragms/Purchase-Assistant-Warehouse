@@ -201,6 +201,12 @@ namespace PurchaseAssistant.Infrastructure.Services
         {
             if (!Enum.IsDefined(role) || role == Domain.Enums.Role.SuperAdmin)
                 throw new ArgumentException("This role cannot be assigned by business user management.");
+
+            // Managers can only create Staff
+            var isPrivileged = _currentUser.Role is "Owner" or "Admin" or "SuperAdmin";
+            if (!isPrivileged && role != Domain.Enums.Role.Staff)
+                throw new UnauthorizedAccessException("Managers can only assign the Staff role.");
+
             if (role == Domain.Enums.Role.Owner && _currentUser.Role is not ("Owner" or "SuperAdmin"))
                 throw new UnauthorizedAccessException("Only an owner can assign an owner membership.");
         }
@@ -208,8 +214,8 @@ namespace PurchaseAssistant.Infrastructure.Services
         private void RequireUserAdministrator()
         {
             if (_currentUser.BusinessId == null || _currentUser.UserId == null
-                || _currentUser.Role is not ("Owner" or "Admin" or "SuperAdmin"))
-                throw new UnauthorizedAccessException("Only business administrators can manage users.");
+                || !(_currentUser.HasPermission(Domain.Constants.Permissions.UsersManage) || _currentUser.Role is "Owner" or "Admin" or "SuperAdmin"))
+                throw new UnauthorizedAccessException("You do not have permission to manage users.");
         }
 
         private static void ValidateProfile(string name, string email)
