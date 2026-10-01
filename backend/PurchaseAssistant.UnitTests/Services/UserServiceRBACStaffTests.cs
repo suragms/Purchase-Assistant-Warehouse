@@ -86,7 +86,7 @@ public class UserServiceRBACStaffTests : IDisposable
     }
 
     [Fact]
-    public async Task Manager_CreatesManagerUser_Rejected()
+    public async Task Manager_AssignsPrivilegedRole_Rejected()
     {
         // Arrange
         _currentUser.UserId = _managerUserId;
@@ -95,10 +95,30 @@ public class UserServiceRBACStaffTests : IDisposable
 
         var newUser = new CreateUserDto
         {
-            Name = "New Manager",
-            Email = "manager2@test.com",
+            Name = "New Admin",
+            Email = "admin@test.com",
             Password = "Password123!",
-            Role = Role.Manager
+            Role = Role.Admin
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _sut.CreateUserAsync(newUser));
+    }
+
+    [Fact]
+    public async Task Staff_CreatesStaffUser_Rejected()
+    {
+        // Arrange
+        _currentUser.UserId = Guid.NewGuid();
+        _currentUser.Role = "Staff";
+        _currentUser.Permissions = new List<string> { };
+
+        var newUser = new CreateUserDto
+        {
+            Name = "Another Staff",
+            Email = "another@test.com",
+            Password = "Password123!",
+            Role = Role.Staff
         };
 
         // Act & Assert
