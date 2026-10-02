@@ -6,17 +6,18 @@ export function BrandLogo({ className = 'h-10 w-12' }: { className?: string }) {
     className={`shrink-0 object-contain rounded ${className}`} />;
 }
 
-export function BrandIdentity({ className = '', inverse = false, logoClassName }: {
+export function BrandIdentity({ className = '', inverse = false, logoClassName, businessName = 'Harisree Agency' }: {
   className?: string;
   inverse?: boolean;
   logoClassName?: string;
+  businessName?: string;
 }) {
   return (
     <div className={`flex min-w-0 items-center gap-2 ${className}`}>
       <BrandLogo className={logoClassName} />
       <div className="min-w-0">
         <p className={`truncate text-sm font-bold leading-tight ${inverse ? 'text-white' : 'text-[#0F172A]'}`} title="Warehouse Assistant">Warehouse Assistant</p>
-        <p className={`truncate text-xs leading-tight ${inverse ? 'text-[#8FC4BC]' : 'text-[#475569]'}`}>Harisree Agency</p>
+        <p className={`truncate text-xs leading-tight ${inverse ? 'text-[#8FC4BC]' : 'text-[#475569]'}`}>{businessName}</p>
       </div>
     </div>
   );

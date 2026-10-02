@@ -106,7 +106,7 @@ for (const width of widths) {
     await page.goto('/dashboard'); await expect(page).toHaveURL(/\/login$/);
     await page.getByLabel('Email address').fill('review@example.test'); await page.getByLabel('Password', { exact: true }).fill('test-password');
     await page.getByRole('button', { name: 'Sign in', exact: true }).click(); await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toBeVisible();
-    const openNav = async () => { if (width < 768) await page.getByRole('button', { name: 'Open navigation' }).click(); };
+    const openNav = async () => { if (width < 768) await page.getByRole('button', { name: 'More', exact: true }).click(); };
     await openNav(); const business = page.getByRole('combobox', { name: 'Business', exact: true });
     await business.selectOption('b2'); await expect(page.getByRole('alert').filter({ visible: true })).toBeVisible();
     await expect(business).toHaveValue('b1'); await business.selectOption('b2'); await openNav();

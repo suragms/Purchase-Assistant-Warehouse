@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Package, Users, Truck,
-  ChevronDown, ChevronRight, Menu, X, LogOut, Search,
+  ChevronDown, ChevronRight, LogOut, Search,
   Boxes, Building2, ShoppingBag, BarChart3, Bell
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
@@ -15,8 +15,9 @@ import apiClient from '../api/apiClient';
 import type { AuthResponse } from '../types/auth';
 import { purchaseErrorMessage } from '../lib/purchaseValidation';
 import { BrandIdentity, BrandLoading } from '../components/BrandIdentity';
+import { MobileHeader, MobileNavigation, useMobileViewport } from './MobileNavigation';
 
-interface NavItem {
+export interface NavItem {
   label: string;
   icon: React.ReactNode;
   to?: string;
@@ -120,13 +121,16 @@ const SidebarNavItem: React.FC<{ item: NavItem; onNavigate?: () => void }> = ({ 
 };
 
 export const AppShell: React.FC = () => {
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const mobile = useMobileViewport();
   const [searchOpen, setSearchOpen] = useState(false);
   const { user, logout, setSession } = useAuthStore();
   const [sessionBusy, setSessionBusy] = useState(false);
   const [sessionError, setSessionError] = useState('');
   const sessionRequest = React.useRef(false);
   const navigate = useNavigate();
+  const visibleItems = navItems.map(item => ({ ...item, children: item.children?.filter(child =>
+    hasPermission(user, child.to === '/catalog/duplicates' ? 'catalog.edit' : child.permission ?? item.permission)) }))
+    .filter(item => item.children ? item.children.length > 0 : hasPermission(user, item.permission));
 
   const handleLogout = async () => {
     if (sessionRequest.current) return;
@@ -181,7 +185,7 @@ export const AppShell: React.FC = () => {
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-1" aria-label="Main navigation">
         {navItems.filter(item => hasPermission(user, item.permission)).map(item => ({ ...item, children: item.children?.filter(child => hasPermission(user, child.permission)) })).map((item) => (
-          <SidebarNavItem key={item.label} item={item} onNavigate={() => setMobileOpen(false)} />
+          <SidebarNavItem key={item.label} item={item} />
         ))}
       </nav>
 
@@ -204,51 +208,22 @@ export const AppShell: React.FC = () => {
   );
 
   return (
-    <div className="flex h-screen bg-[#F7F9F6] overflow-hidden"><RealtimeUpdates />
+    <div className="app-shell flex h-screen bg-[#F7F9F6] overflow-hidden"><RealtimeUpdates />
       {/* Desktop Sidebar */}
       <div className="hidden md:flex flex-col bg-[#0E4F46] shrink-0">
         <Sidebar />
       </div>
 
-      {/* Mobile drawer */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-40 flex md:hidden">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setMobileOpen(false)}
-            aria-hidden="true"
-          />
-          <div className="relative bg-[#0E4F46] shadow-xl z-50">
-            <button
-              className="absolute top-3 right-3 text-white"
-              onClick={() => setMobileOpen(false)}
-              aria-label="Close navigation"
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <Sidebar mobile />
-          </div>
-        </div>
-      )}
-
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
-        <header className="h-14 bg-white border-b border-[#E2E8E6] flex items-center gap-3 px-4 shrink-0">
-          <button
-            className="md:hidden text-[#475569] hover:text-[#0E4F46]"
-            onClick={() => setMobileOpen(true)}
-            aria-label="Open navigation"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-
-          <BrandIdentity className="flex-1 md:hidden" logoClassName="h-6 w-7" />
+        <header className="app-header h-14 bg-white border-b border-[#E2E8E6] flex items-center gap-3 px-4 shrink-0">
+          {mobile && <MobileHeader businessName={user?.currentBusiness?.businessName} />}
 
           {/* Search trigger */}
           <button
             onClick={() => setSearchOpen(true)}
-            className="flex items-center gap-2 shrink-0 md:flex-1 md:max-w-md text-left text-sm text-gray-400 bg-gray-50 border border-[#E2E8E6] rounded-lg px-3 py-1.5 hover:border-[#159A8A] transition-colors focus:outline-none focus:ring-2 focus:ring-[#159A8A]"
+            className="hidden md:flex items-center gap-2 shrink-0 md:flex-1 md:max-w-md text-left text-sm text-gray-400 bg-gray-50 border border-[#E2E8E6] rounded-lg px-3 py-1.5 hover:border-[#159A8A] transition-colors focus:outline-none focus:ring-2 focus:ring-[#159A8A]"
             aria-label="Open search"
           >
             <Search className="h-4 w-4 shrink-0" />
@@ -258,13 +233,13 @@ export const AppShell: React.FC = () => {
             </kbd>
           </button>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="hidden md:flex ml-auto items-center gap-2">
             <span className="hidden sm:block text-sm text-[#475569] font-medium">{user?.name}</span>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="app-main flex-1 overflow-y-auto">
           <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6">
             <React.Suspense
               fallback={
@@ -278,6 +253,7 @@ export const AppShell: React.FC = () => {
           </div>
         </main>
       </div>
+      {mobile && <MobileNavigation user={user} items={visibleItems} onSearch={() => setSearchOpen(true)} onLogout={() => void handleLogout()} onSelectBusiness={selectBusiness} sessionBusy={sessionBusy} sessionError={sessionError} />}
 
       {/* Global Search modal */}
       <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />

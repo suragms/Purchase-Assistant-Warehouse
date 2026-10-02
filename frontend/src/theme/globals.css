@@ -7,3 +7,69 @@
     @apply text-[#475569] bg-[#F7F9F6] font-sans antialiased;
   }
 }
+
+/* The desktop shell retains its existing geometry. Mobile chrome shares one inset. */
+@media (max-width: 767px) {
+  .app-shell {
+    --mobile-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    --mobile-safe-area-top: env(safe-area-inset-top, 0px);
+    --mobile-nav-height: calc(64px + var(--mobile-safe-area-bottom));
+    --mobile-header-height: calc(64px + var(--mobile-safe-area-top));
+    height: 100dvh;
+  }
+  .app-header {
+    height: var(--mobile-header-height);
+    padding: var(--mobile-safe-area-top) max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px));
+    gap: 8px;
+  }
+  .app-main {
+    min-height: 0;
+    margin-bottom: var(--mobile-nav-height);
+    scroll-padding-bottom: 24px;
+    overscroll-behavior-y: contain;
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  .mobile-icon-button {
+    display: inline-flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+  }
+  .mobile-bottom-nav {
+    height: var(--mobile-nav-height);
+    padding: 4px max(4px, env(safe-area-inset-right, 0px)) var(--mobile-safe-area-bottom) max(4px, env(safe-area-inset-left, 0px));
+  }
+  .mobile-bottom-item {
+    display: flex;
+    flex: 1;
+    min-width: 44px;
+    min-height: 44px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+  .mobile-bottom-item:focus-visible { outline: 2px solid #159A8A; outline-offset: -2px; }
+  .mobile-more-panel {
+    left: max(12px, env(safe-area-inset-left, 0px));
+    right: max(12px, env(safe-area-inset-right, 0px));
+    bottom: calc(var(--mobile-nav-height) + 8px);
+    max-height: calc(100dvh - var(--mobile-header-height) - var(--mobile-nav-height) - 16px);
+  }
+  .mobile-notification-panel {
+    position: fixed;
+    top: calc(var(--mobile-header-height) + 8px);
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: calc(100dvh - var(--mobile-header-height) - var(--mobile-nav-height) - 16px);
+    display: flex;
+    flex-direction: column;
+  }
+  .mobile-feedback { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+}

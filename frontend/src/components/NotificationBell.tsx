@@ -1,22 +1,25 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bell, CheckCheck, ExternalLink } from 'lucide-react';
 import { notificationApi, type NotificationDto } from '../api/notificationApi';
 import { notificationKeys } from '../lib/queryKeys';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const container = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   const queryClient = useQueryClient();
 
   const { data: unreadData } = useQuery({
     queryKey: notificationKeys.unreadCount(),
     queryFn: () => notificationApi.getUnreadCount(),
-    refetchInterval: 30000, // poll every 30s
+    // Shared cache is refreshed by notification.changed and reconnect events.
   });
 
-  const { data: listData } = useQuery({
+  const { data: listData, isPending, isError, refetch } = useQuery({
     queryKey: notificationKeys.list({ page: 1, pageSize: 10 }),
     queryFn: () => notificationApi.getNotifications(1, 10, false),
     enabled: open,
@@ -38,6 +41,15 @@ export function NotificationBell() {
 
   const unreadCount = unreadData ?? 0;
   const notifications = listData?.data || [];
+  useEffect(() => { setOpen(false); }, [location.key]);
+  useEffect(() => {
+    if (!open) return;
+    const outside = (event: PointerEvent) => { if (!container.current?.contains(event.target as Node)) setOpen(false); };
+    const key = (event: KeyboardEvent) => { if (event.key === 'Escape') { setOpen(false); trigger.current?.focus(); } };
+    document.addEventListener('pointerdown', outside);
+    document.addEventListener('keydown', key);
+    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', key); };
+  }, [open]);
 
   const handleNotificationClick = (n: NotificationDto) => {
     if (!n.isRead) {
@@ -52,23 +64,25 @@ export function NotificationBell() {
   };
 
   return (
-    <div className="relative">
+    <div ref={container} className="relative">
       <button
+        ref={trigger}
         onClick={() => setOpen(!open)}
-        className="relative p-2 text-slate-600 hover:text-[#0E4F46] hover:bg-slate-100 rounded-lg transition-colors"
+        className="mobile-icon-button relative p-2 text-slate-600 hover:text-[#0E4F46] hover:bg-slate-100 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-[#159A8A]"
         aria-label="Notifications"
+        aria-expanded={open}
+        aria-controls="notification-preview"
+        aria-describedby={unreadCount > 0 ? 'notification-unread' : undefined}
       >
         <Bell className="w-5 h-5" />
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 w-4 h-4 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-            {unreadCount > 9 ? '9+' : unreadCount}
-          </span>
+          <><span aria-hidden="true" className="absolute top-0.5 right-0 min-w-5 h-5 px-1 bg-rose-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{unreadCount > 9 ? '9+' : unreadCount}</span><span id="notification-unread" className="sr-only">{unreadCount} unread notifications</span></>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div id="notification-preview" role="region" aria-label="Notification preview" className="mobile-notification-panel absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+          <div className="p-3 border-b border-slate-100 flex flex-wrap gap-2 items-center justify-between bg-slate-50 shrink-0">
             <div className="flex items-center gap-2">
               <h3 className="font-semibold text-slate-900 text-sm">Notifications</h3>
               {unreadCount > 0 && (
@@ -81,7 +95,8 @@ export function NotificationBell() {
               {unreadCount > 0 && (
                 <button
                   onClick={() => markAllReadMutation.mutate()}
-                  className="text-xs font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                  disabled={markAllReadMutation.isPending}
+                  className="min-h-11 text-xs font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
                 >
                   <CheckCheck className="w-3.5 h-3.5" /> Mark all read
                 </button>
@@ -89,17 +104,19 @@ export function NotificationBell() {
             </div>
           </div>
 
-          <div className="max-h-96 overflow-y-auto divide-y divide-slate-100">
-            {notifications.length === 0 ? (
+          <div className="max-h-96 min-h-0 overflow-y-auto divide-y divide-slate-100">
+            {isPending ? <p role="status" className="p-4 text-sm">Loading notifications…</p> : isError ? <p role="alert" className="p-4 text-sm">Notifications could not be loaded. <button className="min-h-11 underline" onClick={() => void refetch()}>Retry notifications</button></p> : notifications.length === 0 ? (
               <div className="p-8 text-center text-slate-400 text-sm">
                 No notifications found.
               </div>
             ) : (
               notifications.map((n) => (
-                <div
+                <button
+                  type="button"
+                  disabled={markReadMutation.isPending}
                   key={n.id}
                   onClick={() => handleNotificationClick(n)}
-                  className={`p-3.5 hover:bg-slate-50 cursor-pointer transition-colors flex items-start gap-3 ${
+                  className={`w-full min-h-11 text-left p-3.5 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#159A8A] transition-colors flex items-start gap-3 ${
                     !n.isRead ? 'bg-indigo-50/40' : ''
                   }`}
                 >
@@ -120,18 +137,20 @@ export function NotificationBell() {
                   {n.referenceId && (
                     <ExternalLink className="w-4 h-4 text-slate-400 shrink-0 self-center" />
                   )}
-                </div>
+                </button>
               ))
             )}
           </div>
 
-          <div className="p-3 border-t border-slate-100 bg-slate-50 text-center">
+          {(markReadMutation.isError || markAllReadMutation.isError) && <p role="alert" className="px-3 py-2 text-sm text-red-700">Read status could not be saved. Try again.</p>}
+
+          <div className="p-2 border-t border-slate-100 bg-slate-50 text-center shrink-0">
             <button
               onClick={() => {
                 setOpen(false);
                 navigate('/notifications');
               }}
-              className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+              className="min-h-11 px-3 text-sm font-semibold text-indigo-600 hover:text-indigo-800 focus-visible:ring-2 focus-visible:ring-[#159A8A]"
             >
               View all notifications →
             </button>

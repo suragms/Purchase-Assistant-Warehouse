@@ -84,14 +84,15 @@ for (const viewport of viewports) {
     await loadedLogos(page);
     await noOverflow(page);
     await page.screenshot({ path: testInfo.outputPath('dashboard.png'), fullPage: true });
-    await page.getByRole('button', { name: 'Open search', exact: true }).click();
+    if (viewport.width < 768) await page.getByRole('button', { name: 'More', exact: true }).click();
+    await page.getByRole('button', { name: 'Open search', exact: true }).filter({ visible: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByRole('dialog').getByRole('textbox')).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog')).not.toBeVisible();
     if (viewport.width < 768) {
-      await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
-      await expect(page.getByRole('navigation', { name: 'Main navigation' }).filter({ visible: true })).toBeVisible();
+      await page.getByRole('button', { name: 'More', exact: true }).click();
+      await expect(page.getByRole('navigation', { name: 'More navigation' })).toBeVisible();
       await loadedLogos(page);
       const close = page.getByRole('button', { name: 'Close navigation', exact: true });
       await expect(close).toBeInViewport();
