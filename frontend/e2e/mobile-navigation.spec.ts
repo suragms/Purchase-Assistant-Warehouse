@@ -104,3 +104,18 @@ test('scoped SuperAdmin uses existing authorized navigation', async ({ page }) =
   await page.getByRole('navigation', { name: 'Mobile navigation', exact: true }).getByRole('button', { name: 'More', exact: true }).click();
   await expect(page.getByRole('dialog').getByRole('link', { name: 'Users', exact: true })).toBeVisible();
 });
+
+test('long account email keeps mobile Settings fields and actions inside the main viewport', async ({ page }) => {
+  await navigationFixture(page, 'Owner');
+  const email = 'owner-' + 'a'.repeat(32) + '@example.test';
+  await page.route('**/api/v1/settings/profile', route => route.fulfill({ json: { id: 'u1', name: 'Warehouse colleague', email } }));
+  for (const [width, height] of sizes) {
+    await page.setViewportSize({ width, height: Math.min(height, 360) });
+    await page.goto('/settings');
+    await expect(page.getByText(email + ' · Owner', { exact: true })).toBeVisible();
+    await geometry(page);
+    const field = page.getByLabel('Your name', { exact: true });
+    expect(await field.evaluate(element => { const bounds = element.getBoundingClientRect(); return bounds.left >= 0 && bounds.right <= innerWidth; })).toBe(true);
+    await reachable(page.getByRole('button', { name: 'Save personal profile', exact: true }));
+  }
+});

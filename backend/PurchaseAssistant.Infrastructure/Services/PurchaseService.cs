@@ -413,6 +413,9 @@ namespace PurchaseAssistant.Infrastructure.Services
             order.Subtotal = subtotal;
             order.GrandTotal = PurchaseInputLimits.GrandTotal(dto);
 
+            // Replacement lines have assigned GUIDs; explicitly insert them rather than
+            // letting relationship discovery treat them as existing rows to update.
+            _context.PurchaseItems.AddRange(order.Items);
             AddActivity(order, "PurchaseDraftUpdated", new { toStatus = "Draft" });
             await _context.SaveChangesAsync();
             return await GetPurchaseOrderByIdAsync(order.Id);

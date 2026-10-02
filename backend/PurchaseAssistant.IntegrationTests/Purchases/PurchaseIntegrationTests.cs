@@ -318,6 +318,34 @@ namespace PurchaseAssistant.IntegrationTests.Purchases
         }
 
         [Fact]
+        public async Task DraftEditInFreshContextInsertsReplacementLinesAndRejectsStaleReplay()
+        {
+            var created = await CreatePurchaseService().CreatePurchaseOrderAsync(NewOrder());
+            var originalLineId = created.Items.Single().Id;
+            _context.ChangeTracker.Clear(); // Separate HTTP requests do not share tracked entities.
+            var input = NewOrder();
+            input.ExpectedVersion = created.Version;
+            input.Notes = "Reviewed draft edit";
+            var updated = await CreatePurchaseService().UpdatePurchaseOrderAsync(created.Id, input);
+            updated.Notes.Should().Be(input.Notes);
+            updated.Version.Should().NotBe(created.Version);
+            updated.Items.Should().ContainSingle();
+            updated.Items.Single().Id.Should().NotBe(originalLineId);
+            updated.GrandTotal.Should().Be(created.GrandTotal);
+            _context.ChangeTracker.Clear();
+            (await _context.PurchaseItems.CountAsync()).Should().Be(1);
+            (await _context.PurchaseItems.AnyAsync(i => i.Id == originalLineId)).Should().BeFalse();
+            (await _context.CatalogItems.SingleAsync()).CurrentStock.Should().Be(50);
+            (await _context.StockMovements.CountAsync()).Should().Be(0);
+            await FluentActions.Awaiting(() => CreatePurchaseService().UpdatePurchaseOrderAsync(created.Id, input))
+                .Should().ThrowAsync<InvalidOperationException>().WithMessage("PURCHASE_VERSION_CONFLICT");
+            _context.ChangeTracker.Clear();
+            (await _context.PurchaseItems.CountAsync()).Should().Be(1);
+            (await _context.Purchases.SingleAsync()).Notes.Should().Be("Reviewed draft edit");
+            (await _context.StockMovements.CountAsync()).Should().Be(0);
+        }
+
+        [Fact]
         public async Task InvalidReceiptBatchRollsBackAndReleasesTransaction()
         {
             var service = CreatePurchaseService();
