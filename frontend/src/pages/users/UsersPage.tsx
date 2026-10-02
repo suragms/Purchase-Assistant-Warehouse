@@ -15,7 +15,7 @@ export default function UsersPage() {
   const role = user?.currentBusiness?.role;
   const canManage = (['Owner', 'Admin', 'SuperAdmin', 'Manager'].includes(role ?? '')) && (['Owner', 'SuperAdmin', 'Admin'].includes(role ?? '') || !!user?.currentBusiness?.permissions.includes('users.manage'));
   const assignableRoles = USER_ROLES.filter(r => r.value >= 2);
-  const canEdit = (u: UserDto) => canManage && u.id !== user?.id && u.role !== 0 && (u.role !== 1 || role === 'Owner' || role === 'SuperAdmin');
+  const canEdit = (u: UserDto) => canManage && u.id !== user?.id && u.role !== 0 && (u.role !== 1 || role === 'Owner' || role === 'SuperAdmin') && (role !== 'Manager' || u.role === 4);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserDto | null>(null);
   const [editingPermissions, setEditingPermissions] = useState<UserDto | null>(null);

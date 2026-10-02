@@ -25,8 +25,8 @@ namespace PurchaseAssistant.UnitTests.AI
                            .ReturnsAsync(new AIResponse(true, "Success", null, "Gemini", "Model", 0));
 
             var mockFactory = new Mock<IAIProviderFactory>();
-            mockFactory.Setup(f => f.GetProvider(AIProviderType.OpenRouter)).Returns(primaryProvider.Object);
-            mockFactory.Setup(f => f.GetProvider(AIProviderType.Gemini)).Returns(fallbackProvider.Object);
+            mockFactory.Setup(f => f.GetProviderAsync(AIProviderType.OpenRouter, It.IsAny<CancellationToken>())).ReturnsAsync(primaryProvider.Object);
+            mockFactory.Setup(f => f.GetProviderAsync(AIProviderType.Gemini, It.IsAny<CancellationToken>())).ReturnsAsync(fallbackProvider.Object);
 
             var options = Options.Create(new AiOptions { Enabled = true });
             var mockLogger = new Mock<ILogger<AIRoutingService>>();

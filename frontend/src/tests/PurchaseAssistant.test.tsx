@@ -94,7 +94,7 @@ describe('Purchase assistant and authoritative submit', () => {
     expect(purchaseApi.createPurchase).not.toHaveBeenCalled();
   });
   it('renders optional assistant and accepts a prompt', () => {
-    renderForm(); expect(screen.getByText('AI Purchase Assistant')).toBeInTheDocument();
+    renderForm(); expect(screen.getByText('AI Purchase Helper')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Analyze Intent' })).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Enter purchase request'), { target: { value: 'Buy rice' } });
     expect(screen.getByLabelText('Enter purchase request')).toHaveValue('Buy rice');
@@ -141,7 +141,9 @@ describe('Purchase assistant and authoritative submit', () => {
     expect(await screen.findByText('Purchase detail')).toBeInTheDocument();
     expect(screen.getByText('Purchase order created.')).toBeInTheDocument();
     expect(purchaseApi.createPurchase).toHaveBeenCalledWith({ previewToken: 'test-preview', expectedVersion: undefined, orderNumber: expect.stringMatching(/^PO-/), supplierId: 's1', brokerId: undefined,
-      notes: undefined, items: [{ catalogItemId: 'c1', orderedQuantity: 3.25, unitPrice: 4, discountPercent: undefined, taxPercent: undefined, kgPerUnit: undefined, landingCostPerKg: undefined, notes: undefined }] });
+      notes: undefined, freightType: 'separate', commissionMode: 'percent', items: [{ catalogItemId: 'c1', orderedQuantity: 3.25, unitPrice: 4,
+        unit: 'PCS', freightType: undefined, freightAmount: undefined, deliveredCharge: undefined, billtyCharge: undefined,
+        discountPercent: undefined, taxPercent: undefined, kgPerUnit: undefined, landingCostPerKg: undefined, notes: undefined }] });
   });
   it('drops AI financial, tenant, and lifecycle fields', async () => {
     vi.mocked(purchaseIntentApi.parseIntent).mockResolvedValue({ ...draft(), businessId: 'foreign', taxTotal: 9000, status: 'Success', paymentState: 2,

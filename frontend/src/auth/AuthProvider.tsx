@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import apiClient from '../api/apiClient';
-import { Loader2 } from 'lucide-react';
+import { BrandLoading } from '../components/BrandIdentity';
 import { useQueryClient } from '@tanstack/react-query';
 import type { User, AuthResponse } from '../types/auth';
 
@@ -42,9 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   if (isLoading) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-gray-50">
-        <Loader2 className="animate-spin h-10 w-10 text-emerald-600" />
-      </div>
+      <BrandLoading message="Opening your workspace…" fullScreen />
     );
   }
 

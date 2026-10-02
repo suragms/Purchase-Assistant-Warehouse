@@ -1,8 +1,9 @@
 import { RealtimeUpdates } from '../components/RealtimeUpdates';
+import { BackupReminder } from '../components/BackupReminder';
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
-  PackageOpen, LayoutDashboard, Package, Users, Truck,
+  LayoutDashboard, Package, Users, Truck,
   ChevronDown, ChevronRight, Menu, X, LogOut, Search,
   Boxes, Building2, ShoppingBag, BarChart3, Bell
 } from 'lucide-react';
@@ -13,6 +14,7 @@ import { GlobalSearch } from '../components/search/GlobalSearch';
 import apiClient from '../api/apiClient';
 import type { AuthResponse } from '../types/auth';
 import { purchaseErrorMessage } from '../lib/purchaseValidation';
+import { BrandIdentity, BrandLoading } from '../components/BrandIdentity';
 
 interface NavItem {
   label: string;
@@ -159,9 +161,8 @@ export const AppShell: React.FC = () => {
   const Sidebar = ({ mobile = false }: { mobile?: boolean }) => (
     <div className={cn('flex flex-col h-full', mobile ? 'w-72' : 'w-64')}>
       {/* Logo */}
-      <div className="flex items-center gap-2 px-4 py-5 border-b border-white/10">
-        <PackageOpen className="h-7 w-7 text-[#4ECDC4]" />
-        <span className="font-bold text-white text-base leading-tight">Warehouse Assistant<br /><span className="text-xs text-[#8FC4BC] font-normal">Harisree Agency</span></span>
+      <div className={cn('px-4 py-5 border-b border-white/10 shrink-0', mobile && 'pr-10')}>
+        <BrandIdentity inverse logoClassName="h-8 w-10" />
       </div>
 
       {/* Business badge */}
@@ -242,15 +243,17 @@ export const AppShell: React.FC = () => {
             <Menu className="h-5 w-5" />
           </button>
 
+          <BrandIdentity className="flex-1 md:hidden" logoClassName="h-6 w-7" />
+
           {/* Search trigger */}
           <button
             onClick={() => setSearchOpen(true)}
-            className="flex items-center gap-2 flex-1 max-w-md text-left text-sm text-gray-400 bg-gray-50 border border-[#E2E8E6] rounded-lg px-3 py-1.5 hover:border-[#159A8A] transition-colors focus:outline-none focus:ring-2 focus:ring-[#159A8A]"
+            className="flex items-center gap-2 shrink-0 md:flex-1 md:max-w-md text-left text-sm text-gray-400 bg-gray-50 border border-[#E2E8E6] rounded-lg px-3 py-1.5 hover:border-[#159A8A] transition-colors focus:outline-none focus:ring-2 focus:ring-[#159A8A]"
             aria-label="Open search"
           >
             <Search className="h-4 w-4 shrink-0" />
-            <span className="flex-1">Search…</span>
-            <kbd className="hidden sm:inline-flex text-xs bg-white border border-gray-200 rounded px-1.5 py-0.5 text-gray-400">
+            <span className="hidden md:block flex-1">Search…</span>
+            <kbd className="hidden md:inline-flex text-xs bg-white border border-gray-200 rounded px-1.5 py-0.5 text-gray-400">
               ⌘K
             </kbd>
           </button>
@@ -266,11 +269,11 @@ export const AppShell: React.FC = () => {
             <React.Suspense
               fallback={
                 <div className="flex items-center justify-center py-24">
-                  <span className="animate-spin h-8 w-8 border-2 border-[#0E4F46] border-t-transparent rounded-full" />
+                  <BrandLoading />
                 </div>
               }
             >
-              <Outlet />
+              <BackupReminder /><Outlet />
             </React.Suspense>
           </div>
         </main>

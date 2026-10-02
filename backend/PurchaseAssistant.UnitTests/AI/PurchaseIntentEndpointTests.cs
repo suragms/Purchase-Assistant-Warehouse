@@ -33,26 +33,32 @@ public partial class PurchaseIntentEndpointTests
     {
         public string Permission { get; set; } = "purchase.create";
         public Role MemberRole { get; set; } = Role.Staff;
+        public string BackupDirectory { get; set; } = Path.Combine(Path.GetTempPath(), "warehouse-backup-tests", Guid.NewGuid().ToString("N"));
         public Mock<IPurchaseParsingService> Parser { get; } = new();
         public Mock<IPurchaseService> Purchases { get; } = new();
         public Mock<IGlobalSearchService> Search { get; } = new();
         public Mock<IReportService> Reports { get; } = new();
+        public bool RealCsvReports { get; set; }
         public Mock<IDashboardService> Dashboard { get; } = new();
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Jwt:SecretKey", Key);
+            builder.UseSetting("BACKUP_DIR", BackupDirectory);
             builder.ConfigureServices(services => {
                 services.RemoveAll<IPurchaseParsingService>(); services.AddSingleton(Parser.Object);
                 services.RemoveAll<IPurchaseService>(); services.AddSingleton(Purchases.Object);
                 services.RemoveAll<IGlobalSearchService>(); services.AddSingleton(Search.Object);
-                services.RemoveAll<IReportService>(); services.AddSingleton(Reports.Object);
+                services.RemoveAll<IReportService>();
+                if (RealCsvReports) services.AddScoped<IReportService, PurchaseAssistant.Infrastructure.Services.ReportService>();
+                else services.AddSingleton(Reports.Object);
                 services.RemoveAll<IDashboardService>(); services.AddSingleton(Dashboard.Object);
                 services.RemoveAll<DbContextOptions<AppDbContext>>();
                 services.RemoveAll<IDbContextOptionsConfiguration<AppDbContext>>();
                 // Keep one shared in-memory store for this host.
                 var storeName = Guid.NewGuid().ToString();
-                services.AddDbContext<AppDbContext>(o => o.UseInMemoryDatabase(storeName));
+                services.AddDbContext<AppDbContext>(o => o.UseInMemoryDatabase(storeName)
+                    .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning)));
                 using var provider = services.BuildServiceProvider(); using var scope = provider.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 db.Businesses.Add(new Business { Id = BusinessId, Name = "Endpoint business", IsActive = true });
@@ -62,6 +68,13 @@ public partial class PurchaseIntentEndpointTests
                 db.RefreshTokens.Add(new RefreshToken { Id = SessionTokenId, UserId = UserId, FamilyId = SessionId, TokenHash = "fixture-only", TokenDigest = new string('0', 64), ExpiresAt = DateTime.UtcNow.AddDays(1) });
                 db.SaveChanges();
             });
+        }
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+            var root = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "warehouse-backup-tests")) + Path.DirectorySeparatorChar;
+            string directory; try { directory = Path.GetFullPath(BackupDirectory); } catch (ArgumentException) { return; }
+            if (disposing && directory.StartsWith(root, StringComparison.OrdinalIgnoreCase) && Directory.Exists(directory)) Directory.Delete(directory, true);
         }
     }
     private static string Token(string permission, bool business, Guid? sessionId = null, bool sessionClaim = true)

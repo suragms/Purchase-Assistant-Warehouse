@@ -21,10 +21,10 @@ public class BusinessEvents(IHubContext<BusinessEventsHub> hub, IServiceScopeFac
         principal.FindFirstValue("businessId") == businessId.ToString() &&
         (principal.FindFirstValue("role") is "Owner" or "SuperAdmin" || eventType == "notification.changed" ||
         principal.HasClaim("permissions", eventType.StartsWith("stock.") ? "stock.view" : "purchase.view"));
-    public async Task Publish(Guid businessId, string eventType)
+    public async Task Publish(Guid businessId, string eventType, Guid? itemId = null, Guid? purchaseId = null)
     {
         if (eventType is not ("stock.changed" or "stock.physical_counted" or "purchase.changed" or "notification.changed")) return;
-        var message = new { id = Guid.NewGuid(), type = eventType, businessId, createdAt = DateTime.UtcNow };
+        var message = new { id = Guid.NewGuid(), type = eventType, businessId, createdAt = DateTime.UtcNow, payload = new { itemId, purchaseId } };
         foreach (var (connectionId, stored) in connections.ToArray())
         {
             if (stored.FindFirstValue("businessId") != businessId.ToString()) continue;
@@ -33,7 +33,7 @@ public class BusinessEvents(IHubContext<BusinessEventsHub> hub, IServiceScopeFac
                 var principal = stored.Clone();
                 if (!await CurrentUserService.ValidateSessionAsync(principal, db)) { Disconnect(connectionId); continue; }
                 if (CanReceive(principal, businessId, eventType)) await hub.Clients.Client(connectionId).SendAsync("businessEvent", message);
-            } catch (Exception ex) { logger.LogWarning(ex, "Realtime invalidation delivery failed"); }
+            } catch (Exception) { logger.LogWarning("Realtime invalidation delivery failed"); }
         }
     }
 }
@@ -47,8 +47,9 @@ public class BusinessEventFilter(BusinessEvents events) : IAsyncActionFilter
         var status = result.Result switch { ObjectResult o => o.StatusCode ?? 200, StatusCodeResult s => s.StatusCode, _ => context.HttpContext.Response.StatusCode };
         if (status >= 400 || !Guid.TryParse(context.HttpContext.User.FindFirstValue("businessId"), out var business)) return;
         var controller = context.Controller.GetType().Name; var path = context.HttpContext.Request.Path.Value ?? "";
-        if (controller == "StockController") { if (path.Contains("physical")) await events.Publish(business, "stock.physical_counted"); await events.Publish(business, "stock.changed"); }
-        if (controller == "PurchaseController" && !path.EndsWith("preview")) { await events.Publish(business, "purchase.changed"); if (path.Contains("receive")) await events.Publish(business, "stock.changed"); }
+        var entity = Guid.TryParse(context.RouteData.Values.GetValueOrDefault("id")?.ToString(), out var id) ? (Guid?)id : null;
+        if (controller == "StockController") { if (path.Contains("physical")) await events.Publish(business, "stock.physical_counted", itemId: entity); await events.Publish(business, "stock.changed", itemId: entity); }
+        if (controller == "PurchaseController" && !path.EndsWith("preview")) { await events.Publish(business, "purchase.changed", purchaseId: entity); if (path.Contains("receive")) await events.Publish(business, "stock.changed", purchaseId: entity); }
         if (controller == "ApiOperationController" && path.EndsWith("usage")) await events.Publish(business, "stock.changed");
         if (controller is "NotificationsController" or "DamageReportController") await events.Publish(business, "notification.changed");
     }

@@ -8,10 +8,29 @@ using PurchaseAssistant.Domain.Entities;
 using PurchaseAssistant.Infrastructure.Data;
 using PurchaseAssistant.Infrastructure.Services;
 using System.Text.Json;
+using PurchaseAssistant.Web.Services;
 namespace PurchaseAssistant.Web.Controllers;
 [ApiController, Route("api/v1/settings"), Authorize(Policy = "RequireSelectedBusiness")]
-public class SettingsController(AppDbContext db, ICurrentUserService user, IBusinessLogoStorage logos) : ControllerBase
+public class SettingsController(AppDbContext db, ICurrentUserService user, IBusinessLogoStorage logos, ProviderCredentialService credentials) : ControllerBase
 {
+    [HttpGet("profile")]
+    public async Task<IActionResult> PersonalProfile()
+    {
+        var u = await db.Users.SingleOrDefaultAsync(x => x.Id == user.UserId) ?? throw new KeyNotFoundException();
+        return Ok(new PersonalProfileDto(u.Id, u.Name, u.Email));
+    }
+    [HttpPut("profile")]
+    public async Task<IActionResult> PersonalProfile(PersonalProfileUpdateDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Name)) throw new ArgumentException("Name is required.");
+        var u = await db.Users.SingleOrDefaultAsync(x => x.Id == user.UserId) ?? throw new KeyNotFoundException();
+        u.Name = dto.Name.Trim(); u.UpdatedAt = DateTime.UtcNow; await db.SaveChangesAsync();
+        return Ok(new PersonalProfileDto(u.Id, u.Name, u.Email));
+    }
+    [HttpGet("credentials"), Authorize(Roles = "Owner,Admin,SuperAdmin")]
+    public async Task<IActionResult> Credentials() => Ok(await credentials.ListAsync());
+    [HttpPut("credentials/{type}"), Authorize(Roles = "Owner,Admin,SuperAdmin")]
+    public async Task<IActionResult> Credentials(string type, CredentialUpdateDto dto) => Ok(await credentials.SaveAsync(type, dto));
     private async Task<Business> Business() => await db.Businesses.SingleOrDefaultAsync(x => x.Id == user.BusinessId && x.IsActive) ?? throw new KeyNotFoundException();
     private BusinessProfileDto Map(Business b) => new() { Name = b.Name, BrandingTitle = b.BrandingTitle, BrandingLogoUrl = b.BrandingLogoUrl, GstNumber = b.GstNumber, Address = b.Address, Phone = b.Phone, ContactEmail = b.ContactEmail, Version = b.Version, HasUploadedLogo = b.LogoStorageKey != null, LogoUploadAvailable = logos.Available };
     [HttpGet("business")]

@@ -243,6 +243,8 @@ namespace PurchaseAssistant.Infrastructure.Services
             {
                 if (!allKnown.Contains(p))
                     throw new ArgumentException($"Unknown permission: {p}");
+                if (_currentUser.Role == "Manager" && (!_currentUser.HasPermission(p) || p is Permissions.UsersManage or Permissions.UsersView or Permissions.RolesManage or Permissions.SettingsManage or Permissions.ProvidersManage))
+                    throw new UnauthorizedAccessException("Managers cannot grant privileged permissions.");
                 current.Add(p);
             }
             foreach (var p in patch.Revoke ?? [])
@@ -274,6 +276,7 @@ namespace PurchaseAssistant.Infrastructure.Services
         private void RequireUserAdministrator()
         {
             if (_currentUser.BusinessId == null || _currentUser.UserId == null
+                || _currentUser.Role is not ("Owner" or "Admin" or "Manager" or "SuperAdmin")
                 || !(_currentUser.HasPermission(Domain.Constants.Permissions.UsersManage) || _currentUser.Role is "Owner" or "Admin" or "SuperAdmin"))
                 throw new UnauthorizedAccessException("You do not have permission to manage users.");
         }
@@ -288,6 +291,8 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         private void ValidateProtectedMembership(Membership membership)
         {
+            if (_currentUser.Role == "Manager" && membership.Role != Domain.Enums.Role.Staff)
+                throw new UnauthorizedAccessException("Managers can manage only Staff memberships.");
             if (membership.Role == Domain.Enums.Role.SuperAdmin || membership.Role == Domain.Enums.Role.Owner && _currentUser.Role is not ("Owner" or "SuperAdmin"))
                 throw new UnauthorizedAccessException("You cannot modify this privileged membership.");
         }

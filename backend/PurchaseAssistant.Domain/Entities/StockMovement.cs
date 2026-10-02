@@ -22,6 +22,6 @@ namespace PurchaseAssistant.Domain.Entities
 
         public Guid CreatedById { get; set; }
         public User CreatedBy { get; set; } = null!;
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public new DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }

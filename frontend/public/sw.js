@@ -1,5 +1,5 @@
-const CACHE = 'purchase-assistant-shell-v1';
-const PUBLIC_FILES = ['/offline.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
+const CACHE = 'purchase-assistant-shell-v3';
+const PUBLIC_FILES = ['/offline.html', '/manifest.webmanifest', '/favicon.png', '/icon-192.png', '/icon-512.png'];
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(PUBLIC_FILES))));
 self.addEventListener('activate', event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('purchase-assistant-shell-') && key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim())));
 self.addEventListener('message', event => { if (event.data === 'ACTIVATE_UPDATE') self.skipWaiting(); });

@@ -22,6 +22,13 @@ namespace PurchaseAssistant.Application.Interfaces
 
         // Daily Snapshot Materialization
         Task<int> MaterializeSnapshotsAsync(DateTime? forDate = null);
+        Task<List<DailyUsageSnapshotDto>> GetSnapshotsAsync(DateTime? fromDate, DateTime? toDate, Guid? itemId);
+        Task<List<StaffTaskDto>> GetStaffTasksAsync(string? status, Guid? staffId);
+        Task<List<TaskAssigneeDto>> GetTaskAssigneesAsync();
+        Task<StaffTaskDto> CreateStaffTaskAsync(StaffTaskCreateDto dto);
+        Task<StaffTaskDto> ActOnStaffTaskAsync(Guid id, StaffTaskActionDto dto, bool accept);
+        Task<List<StaffPerformanceDto>> GetStaffPerformanceAsync();
+        Task<OwnerOperationsDashboardDto> GetOwnerDashboardAsync();
 
         // Report specific aggregations matching reference implementations
         Task<OperationsReportSummaryDto> GetOperationsReportSummaryAsync();

@@ -11,7 +11,7 @@ using PurchaseAssistant.Infrastructure.Data;
 
 namespace PurchaseAssistant.Infrastructure.Services
 {
-    public class StockService : IStockService
+    public partial class StockService : IStockService
     {
         private readonly AppDbContext _context;
         private readonly ICurrentUserService _currentUser;

@@ -4,6 +4,21 @@ using PurchaseAssistant.Domain.Entities;
 
 namespace PurchaseAssistant.Infrastructure.Data.Configurations
 {
+    public class StaffTaskConfiguration : IEntityTypeConfiguration<StaffTask>
+    {
+        public void Configure(EntityTypeBuilder<StaffTask> b)
+        {
+            b.Property(x => x.TaskType).HasMaxLength(64);
+            b.Property(x => x.ReferenceId).HasMaxLength(255);
+            b.Property(x => x.Status).HasMaxLength(16);
+            b.Property(x => x.CorrectionNote).HasMaxLength(1000);
+            b.Property(x => x.Version).IsConcurrencyToken();
+            b.HasIndex(x => new { x.BusinessId, x.StaffId, x.Status, x.AssignedAt });
+            b.HasOne<Membership>().WithMany().HasForeignKey(x => new { x.BusinessId, x.StaffId })
+                .HasPrincipalKey(x => new { x.BusinessId, x.UserId }).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<User>().WithMany().HasForeignKey(x => x.CreatedById).OnDelete(DeleteBehavior.Restrict);
+        }
+    }
     public class ChecklistTemplateConfiguration : IEntityTypeConfiguration<ChecklistTemplate>
     {
         public void Configure(EntityTypeBuilder<ChecklistTemplate> b)

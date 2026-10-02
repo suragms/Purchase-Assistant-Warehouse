@@ -17,7 +17,7 @@ namespace PurchaseAssistant.IntegrationTests.Stock
     /// Covers transaction rollback, concurrency, and tenant isolation — behaviors InMemory cannot prove.
     /// Tests are isolated using per-test unique Business IDs and cleaned up after each run.
     /// </summary>
-    public class StockServiceIntegrationTests : IAsyncLifetime
+    public partial class StockServiceIntegrationTests : IAsyncLifetime
     {
         private const string ConnectionString =
             "Host=localhost;Database=warehouse_erp_dev;Username=modelbridge;Password=modelbridge";
@@ -63,11 +63,20 @@ namespace PurchaseAssistant.IntegrationTests.Stock
 
         public async Task DisposeAsync()
         {
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"PurchaseItems\" WHERE \"BusinessId\" = {0}", _businessId);
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"Purchases\" WHERE \"BusinessId\" = {0}", _businessId);
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"BackupLogs\" WHERE \"BusinessId\" = {0}", _businessId);
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"AiUsageLogs\" WHERE \"BusinessId\" = {0}", _businessId);
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"SecurityAuditLogs\" WHERE \"BusinessId\" = {0}", _businessId);
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"ChecklistCompletion\" WHERE \"BusinessId\" = {0}", _businessId);
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"DailyUsageLogs\" WHERE \"BusinessId\" = {0}", _businessId);
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"DailyOperationSnapshots\" WHERE \"BusinessId\" = {0}", _businessId);
             // Clean up in reverse FK order to avoid constraint errors
             await _context.Database.ExecuteSqlRawAsync(
                 "DELETE FROM \"StockMovements\" WHERE \"BusinessId\" = {0}", _businessId);
             await _context.Database.ExecuteSqlRawAsync(
                 "DELETE FROM \"CatalogItems\" WHERE \"BusinessId\" = {0}", _businessId);
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"Suppliers\" WHERE \"BusinessId\" = {0}", _businessId);
             await _context.Database.ExecuteSqlRawAsync(
                 "DELETE FROM \"Categories\" WHERE \"BusinessId\" = {0}", _businessId);
             await _context.Database.ExecuteSqlRawAsync(

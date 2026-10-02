@@ -11,7 +11,7 @@ async function mocks(page: Page) {
     if (path === '/auth/refresh') data = { data: { accessToken: 'mock-session', user: { id: 'u1', name: 'Reviewer', email: 'review@example.test', businesses: [], currentBusiness: { businessId: 'b1', businessName: 'Test Warehouse', role: 'Owner', permissions: [] } } } };
     else if (path === '/catalog/suppliers') data = [supplier];
     else if (path === '/catalog/brokers' || path === '/users' || path === '/reports/spend') data = [];
-    else if (path === '/purchases/p1/activity') data = [];
+    else if (path === '/purchases/p1/activity' || path === '/purchases/p1/damage-reports') data = [];
     else if (path === '/catalog/items') data = paged([catalog]);
     else if (path === '/catalog/items/duplicates' || path === '/catalog/categories' || path.includes('/types')) data = [];
     else if (path === '/catalog/items/c1') data = { ...catalog, categoryId: 'cat1', categoryName: 'Food', currentStock: 10, reorderLevel: 2, kgPerUnit: 1, rowVersion: 'v1' };
@@ -40,7 +40,7 @@ for (const width of [320, 375, 390, 430, 768, 1024, 1280, 1440, 1920]) {
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
     const calls = await mocks(page);
     await page.goto('/purchases/new');
-    await expect(page.getByRole('heading', { name: 'AI Purchase Assistant' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'AI Purchase Helper' })).toBeVisible();
     await page.getByLabel('Enter purchase request').fill('Buy 2.5 kg rice from Supplier A');
     await page.getByRole('button', { name: 'Analyze Intent' }).click();
     await expect(page.getByText('Review AI suggestions')).toBeVisible();

@@ -5,6 +5,7 @@ import { catalogApi, type Supplier } from '../../api/catalogApi';
 import { supplierKeys } from '../../lib/queryKeys';
 import { PageHeader, Button, Card, Skeleton, ErrorState, ConfirmDialog, Modal, Input, Textarea, Badge } from '../../components/ui';
 import { useToast } from '../../components/ui/ToastProvider';
+import { CsvExportButton } from '../../components/CsvExportButton';
 
 export default function SupplierList() {
   const queryClient = useQueryClient();
@@ -106,7 +107,7 @@ export default function SupplierList() {
         }
       />
 
-      <Card className="overflow-hidden">
+      <Card className="overflow-x-auto">
         {isLoading ? (
           <div className="p-4 space-y-4">
             {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
@@ -134,6 +135,7 @@ export default function SupplierList() {
                     {s.isActive ? <Badge variant="green">Active</Badge> : <Badge variant="gray">Inactive</Badge>}
                   </td>
                   <td className="px-4 py-3 text-right space-x-2">
+                    {s.isActive && <CsvExportButton kind="supplier" label="Purchase CSV" supplierId={s.id} />}
                     <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(s)}>
                       <Edit className="h-4 w-4" />
                     </Button>

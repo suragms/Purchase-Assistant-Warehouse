@@ -18,3 +18,14 @@ public class UserSettingsDto
     public bool NotificationsEnabled { get; set; } = true;
     public string[] NotificationKinds { get; set; } = ["low_stock", "delivery", "stock_variance", "staff_alert", "opening_stock", "physical_reminder"];
 }
+public class PersonalProfileUpdateDto
+{
+    [Required, StringLength(150)] public string Name { get; set; } = "";
+}
+public record PersonalProfileDto(Guid Id, string Name, string Email);
+public class CredentialUpdateDto
+{
+    [Required, StringLength(4096, MinimumLength = 1)] public string Value { get; set; } = "";
+    public Guid? ExpectedVersion { get; set; }
+}
+public record CredentialStatusDto(string CredentialType, bool Configured, string LastFour, DateTime? UpdatedAt, Guid Version);

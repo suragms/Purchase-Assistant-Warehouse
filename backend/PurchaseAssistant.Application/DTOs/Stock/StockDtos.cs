@@ -3,6 +3,9 @@ using System;
 
 namespace PurchaseAssistant.Application.DTOs.Stock
 {
+    public record StockCsvRow(Guid Id, string Name, string Category, string? Subcategory, string Unit,
+        [property: OperationalNumeric] decimal Current, [property: OperationalNumeric] decimal Physical,
+        [property: OperationalNumeric] decimal Reorder, [property: OperationalNumeric] decimal? Purchased, string Status, string? Supplier, DateTime? LastMovement);
     public class StockItemDto
     {
         public Guid Id { get; set; }

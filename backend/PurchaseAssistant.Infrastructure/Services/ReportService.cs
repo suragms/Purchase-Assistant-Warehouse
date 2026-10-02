@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace PurchaseAssistant.Infrastructure.Services
 {
-    public class ReportService : IReportService
+    public partial class ReportService : IReportService
     {
         private readonly AppDbContext _context;
 
@@ -17,6 +17,11 @@ namespace PurchaseAssistant.Infrastructure.Services
         {
             _context = context;
         }
+
+        // Shared authoritative eligibility for reports, exports and business backups.
+        public static IQueryable<Domain.Entities.PurchaseOrder> ReportingPurchases(AppDbContext context, Guid businessId)
+            => context.Purchases.AsNoTracking().Where(p => p.BusinessId == businessId
+                && p.Status != Domain.Enums.PurchaseStatus.Cancelled && p.Status != Domain.Enums.PurchaseStatus.Draft);
 
         private static void ValidatePeriod(ref DateTime startDate, ref DateTime endDate)
         {
@@ -30,9 +35,7 @@ namespace PurchaseAssistant.Infrastructure.Services
         {
             ValidatePeriod(ref startDate, ref endDate);
             if (groupBy is not ("day" or "month")) throw new ArgumentException("Choose day or month for spend grouping.");
-            var query = _context.Purchases
-                .AsNoTracking()
-                .Where(p => p.BusinessId == businessId && p.CreatedAt >= startDate && p.CreatedAt <= endDate && p.Status != Domain.Enums.PurchaseStatus.Cancelled && p.Status != Domain.Enums.PurchaseStatus.Draft);
+            var query = ReportingPurchases(_context, businessId).Where(p => p.CreatedAt >= startDate && p.CreatedAt <= endDate);
 
             var rawData = await query
                 .Select(p => new { p.CreatedAt, p.GrandTotal })
@@ -68,9 +71,7 @@ namespace PurchaseAssistant.Infrastructure.Services
         public async Task<PurchaseSummaryReportDto> GetPurchaseSummaryAsync(Guid businessId, DateTime startDate, DateTime endDate)
         {
             ValidatePeriod(ref startDate, ref endDate);
-            var purchasesQuery = _context.Purchases
-                .AsNoTracking()
-                .Where(p => p.BusinessId == businessId && p.CreatedAt >= startDate && p.CreatedAt <= endDate && p.Status != Domain.Enums.PurchaseStatus.Cancelled && p.Status != Domain.Enums.PurchaseStatus.Draft);
+            var purchasesQuery = ReportingPurchases(_context, businessId).Where(p => p.CreatedAt >= startDate && p.CreatedAt <= endDate);
 
             // By Supplier
             var bySupplier = await purchasesQuery

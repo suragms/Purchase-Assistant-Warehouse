@@ -1,7 +1,8 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '../auth/AuthProvider';
-import { RouteErrorBoundary } from '../components/RouteErrorBoundary';
+import { RouteErrorBoundary } from '../components/RouteErrorBoundary';
+import { BrandLoading } from '../components/BrandIdentity';
 import { ProtectedRoute, PermissionRoute } from '../auth/Guards';
 import { ToastProvider } from '../components/ui/ToastProvider';
 import { AppShell } from '../layouts/AppShell';
@@ -29,7 +30,9 @@ const PurchaseDetail = React.lazy(() => import('../pages/purchases/PurchaseDetai
 const ReportsDashboard = React.lazy(() => import('../pages/reports/ReportsDashboard'));
 const NotificationsPage = React.lazy(() => import('../pages/NotificationsPage'));
 const OperationsPage = React.lazy(() => import('../pages/OperationsPage'));
-const SettingsPage = React.lazy(() => import('../pages/SettingsPage'));
+const SettingsPage = React.lazy(() => import('../pages/SettingsPage'));
+const BackupPage = React.lazy(() => import('../pages/BackupPage'));
+const HelpGuidePage = React.lazy(() => import('../pages/HelpGuidePage'));
 const UsersPage = React.lazy(() => import('../pages/users/UsersPage'));
 
 export const AppRouter = () => {
@@ -37,7 +40,7 @@ export const AppRouter = () => {
     <BrowserRouter>
       <ToastProvider>
         <AuthProvider>
-          <RouteErrorBoundary><React.Suspense fallback={<div role="status" className="p-8">Loading page…</div>}><Routes>
+          <RouteErrorBoundary><React.Suspense fallback={<BrandLoading fullScreen />}><Routes>
             <Route path="/login" element={<Login />} />
 
             <Route path="/" element={<ProtectedRoute />}>
@@ -83,7 +86,9 @@ export const AppRouter = () => {
                 <Route path="notifications" element={<NotificationsPage />} />
 
                 <Route path="operations" element={<PermissionRoute><OperationsPage /></PermissionRoute>} />
-                <Route path="settings" element={<PermissionRoute><SettingsPage /></PermissionRoute>} />
+                <Route path="settings" element={<PermissionRoute><SettingsPage /></PermissionRoute>} />
+                <Route path="settings/backup" element={<PermissionRoute permission="reports.view"><BackupPage /></PermissionRoute>} />
+                <Route path="settings/help" element={<PermissionRoute><HelpGuidePage /></PermissionRoute>} />
                 <Route path="*" element={<div className="p-6"><h1 className="text-xl font-bold">Page not found</h1><a href="/dashboard">Return to dashboard</a></div>} />
                 <Route path="users" element={<PermissionRoute permission="users.view"><UsersPage /></PermissionRoute>} />
               </Route>

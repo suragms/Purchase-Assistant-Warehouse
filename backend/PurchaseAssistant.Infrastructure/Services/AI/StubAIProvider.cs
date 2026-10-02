@@ -7,17 +7,16 @@ public class StubAIProvider : IAIProvider
 {
     public AIProviderType ProviderType => AIProviderType.Stub;
 
-    public async Task<AIResponse> SendRequestAsync(AIRequest request, CancellationToken ct = default)
+    public Task<AIResponse> SendRequestAsync(AIRequest request, CancellationToken ct = default)
     {
-        await Task.Delay(100, ct); // Simulate latency
-
-        return new AIResponse(
-            Success: true,
-            Content: "{\"status\": \"stubbed_success\"}",
-            Error: null,
+        ct.ThrowIfCancellationRequested();
+        return Task.FromResult(new AIResponse(
+            Success: false,
+            Content: null,
+            Error: "AI_NOT_CONFIGURED",
             Provider: ProviderType.ToString(),
-            ModelUsed: "stub-model",
-            LatencyMs: 100
-        );
+            ModelUsed: "None",
+            LatencyMs: 0
+        ));
     }
 }

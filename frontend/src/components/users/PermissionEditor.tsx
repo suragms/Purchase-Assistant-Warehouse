@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersApi, ALL_PERMISSIONS } from '../../api/usersApi';
-import { ShieldAlert, ShieldCheck, Shield, AlertCircle, Save, X } from 'lucide-react';
+import { ShieldCheck, Shield, AlertCircle, Save, X } from 'lucide-react';
 import { purchaseErrorMessage } from '../../lib/purchaseValidation';
 import { cn } from '../../lib/cn';
 

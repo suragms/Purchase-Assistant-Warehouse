@@ -94,8 +94,14 @@ builder.Services.AddScoped<IPurchaseDamageService, PurchaseDamageService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<BusinessBackupService>();
+builder.Services.AddScoped<IAIUsageRecorder, AiUsageRecorder>();
+if (!builder.Environment.IsEnvironment("Testing")) builder.Services.AddHostedService<BusinessBackupWorker>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IOperationsService, OperationsService>();
+builder.Services.AddScoped<ProviderCredentialService>();
+builder.Services.AddScoped<IProviderCredentialResolver>(sp => sp.GetRequiredService<ProviderCredentialService>());
 builder.Services.AddSingleton<IBusinessLogoStorage>(new BusinessLogoStorage(
     builder.Environment.IsDevelopment() ? builder.Configuration["Images:StoragePath"] ?? Path.Combine(builder.Environment.ContentRootPath, "App_Data", "logos") : builder.Configuration["Images:StoragePath"]));
 builder.Services.AddHttpContextAccessor();
@@ -114,7 +120,7 @@ builder.Services.AddScoped<IAIProvider>(sp => new GeminiProvider(sp.GetRequiredS
 builder.Services.AddScoped<IAIProvider>(sp => new GroqProvider(sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(GroqProvider)), builder.Configuration["AI:Providers:Groq:ApiKey"] ?? ""));
 builder.Services.AddScoped<IAIProvider>(sp => new OpenRouterProvider(sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(OpenRouterProvider)), builder.Configuration["AI:Providers:OpenRouter:ApiKey"] ?? ""));
 builder.Services.AddScoped<IAIProvider, StubAIProvider>();
-builder.Services.AddScoped<IAIProviderFactory, AIProviderFactory>();
+builder.Services.AddScoped<IAIProviderFactory>(sp => new AIProviderFactory(sp.GetServices<IAIProvider>(), sp.GetRequiredService<IProviderCredentialResolver>(), sp.GetRequiredService<IHttpClientFactory>().CreateClient));
 builder.Services.AddScoped<IAIRoutingService, AIRoutingService>();
 
 // Database
@@ -161,8 +167,8 @@ builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("RequireSelectedBusiness", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId"));
     // Define commonly used policies safely
-    options.AddPolicy("RequireUsersView", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.UsersView)));
-    options.AddPolicy("RequireUsersManage", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").RequireRole("Owner", "Admin", "SuperAdmin").AddRequirements(new PermissionRequirement(Permissions.UsersManage)));
+    options.AddPolicy("RequireUsersView", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").RequireRole("Owner", "Admin", "Manager", "SuperAdmin").AddRequirements(new PermissionRequirement(Permissions.UsersView)));
+    options.AddPolicy("RequireUsersManage", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").RequireRole("Owner", "Admin", "Manager", "SuperAdmin").AddRequirements(new PermissionRequirement(Permissions.UsersManage)));
     options.AddPolicy("RequireCatalogView", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.CatalogView)));
     options.AddPolicy("RequireCatalogCreate", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.CatalogCreate)));
     options.AddPolicy("RequireCatalogEdit", policy => policy.RequireAuthenticatedUser().RequireClaim("businessId").AddRequirements(new PermissionRequirement(Permissions.CatalogEdit)));
@@ -200,6 +206,7 @@ builder.Services.AddCors(options =>
         b.WithOrigins(origins)
          .AllowAnyHeader()
          .AllowAnyMethod()
+         .WithExposedHeaders("Content-Disposition")
          .AllowCredentials();
     });
 });

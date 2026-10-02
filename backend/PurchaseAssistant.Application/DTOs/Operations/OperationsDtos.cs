@@ -24,6 +24,7 @@ namespace PurchaseAssistant.Application.DTOs.Operations
         public bool IsCompleted { get; set; }
         public DateTime? CompletedAt { get; set; }
         public string? CompletedByUser { get; set; }
+        public string? Notes { get; set; }
     }
 
     /// <summary>
@@ -119,6 +120,7 @@ namespace PurchaseAssistant.Application.DTOs.Operations
     {
         public DateTime Date { get; set; }
         public int TotalItems { get; set; }
+        public int MissingItems { get; set; }
         [OperationalNumeric]
         public decimal TotalQuantityUsed { get; set; }
         public List<UsageLineDto> TopItems { get; set; } = new();
@@ -149,9 +151,59 @@ namespace PurchaseAssistant.Application.DTOs.Operations
         public DateTime EndDate { get; set; }
         public int TotalDays { get; set; }
         public int CompletedDays { get; set; }
+        public int TotalTasks { get; set; }
+        public int CompletedTasks { get; set; }
         [OperationalNumeric]
         public decimal AverageCompletionRate { get; set; }
         public List<string> FrequentlySkippedTasks { get; set; } = new();
+    }
+
+    public class DailyUsageSnapshotDto : UsageLineDto
+    {
+        public DateTime Date { get; set; }
+    }
+    public class StaffTaskCreateDto
+    {
+        public Guid StaffId { get; set; }
+        [Required, StringLength(64)] public string TaskType { get; set; } = "general";
+        [StringLength(255)] public string? ReferenceId { get; set; }
+    }
+    public class StaffTaskActionDto
+    {
+        public Guid ExpectedVersion { get; set; }
+        public bool Rejected { get; set; }
+        [StringLength(1000)] public string? CorrectionNote { get; set; }
+    }
+    public class StaffTaskDto
+    {
+        public Guid Id { get; set; }
+        public Guid StaffId { get; set; }
+        public string StaffName { get; set; } = "";
+        public string TaskType { get; set; } = "";
+        public string? ReferenceId { get; set; }
+        public string Status { get; set; } = "";
+        public bool Rejected { get; set; }
+        public string? CorrectionNote { get; set; }
+        public DateTime AssignedAt { get; set; }
+        public DateTime? AcceptedAt { get; set; }
+        public DateTime? CompletedAt { get; set; }
+        public Guid Version { get; set; }
+    }
+    public record TaskAssigneeDto(Guid Id, string Name);
+    public record StaffPerformanceDto(Guid StaffId, string StaffName, int Total, int Completed, int Pending, int Rejected);
+    public class OwnerOperationsDashboardDto
+    {
+        public DateTime AsOf { get; set; }
+        public int LowStockCount { get; set; }
+        public int OutOfStockCount { get; set; }
+        public int PendingDamageCount { get; set; }
+        public int AiRequestsToday { get; set; }
+        public string? BackupLastStatus { get; set; }
+        public DateTime? BackupLastAt { get; set; }
+        public long? BackupLastSizeBytes { get; set; }
+        [FinancialField] public decimal SpendLast7Days { get; set; }
+        public List<string> Exceptions { get; set; } = new();
+        public List<StaffPerformanceDto> StaffPerformance { get; set; } = new();
     }
 }
 namespace PurchaseAssistant.Application.DTOs.Operations
@@ -160,15 +212,27 @@ namespace PurchaseAssistant.Application.DTOs.Operations
     {
         public string Method { get; set; } = "RULE-BASED";
         public List<OperationsReportItemDto> Items { get; set; } = new();
+        public Dictionary<string, int> Summary { get; set; } = new();
+        public List<OperationsReportItemDto> DeadStock { get; set; } = new();
+        public List<OperationsReportItemDto> FastMoving { get; set; } = new();
+        public List<OperationsReportItemDto> SlowMoving { get; set; } = new();
+        public List<SupplierFrequencyDto> SupplierFrequency { get; set; } = new();
     }
     public class OperationsReportItemDto
     {
         public Guid Id { get; set; }
         public string Name { get; set; } = "";
+        public string ItemCode { get; set; } = "";
+        public string Category { get; set; } = "";
+        public string Unit { get; set; } = "";
+        public DateTime? LastMovementAt { get; set; }
+        public string AgingBucket { get; set; } = "";
+        public string InsightKey { get; set; } = "";
         [OperationalNumeric] public decimal CurrentStock { get; set; }
         [OperationalNumeric] public decimal Used7d { get; set; }
         [OperationalNumeric] public decimal Used30d { get; set; }
         public int IdleDays { get; set; }
         public string MovementStatus { get; set; } = "";
     }
+    public record SupplierFrequencyDto(Guid SupplierId, string SupplierName, int PurchaseCount);
 }

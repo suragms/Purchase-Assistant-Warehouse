@@ -53,7 +53,7 @@ export const PurchaseAssistant = ({ onDraftConfirmed, disabled = false }: Purcha
 
   return (
     <Card className="p-4 mb-6 min-w-0 break-words">
-      <h2 className="text-xl font-bold mb-2">AI Purchase Assistant</h2>
+      <h2 className="text-xl font-bold mb-2">AI Purchase Helper</h2>
       <p className="text-sm text-slate-600 mb-4">Optional: describe your purchase, review the suggestions, then apply them to the form. Nothing is saved until you create the purchase order.</p>
       <Textarea label="Enter purchase request" value={prompt} maxLength={4000} disabled={parse.isPending || disabled}
         onChange={e => { setPrompt(e.target.value); setCandidate(null); }} placeholder="e.g., Buy 10 units of Rice from Supplier X" />

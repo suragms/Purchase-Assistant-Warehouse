@@ -547,7 +547,7 @@ public class ReferenceAuditSafetyTests : IDisposable
         var membership = await db.Memberships.SingleAsync(m => m.UserId == created.Id);
         var permissions = System.Text.Json.JsonSerializer.Deserialize<List<string>>(membership.PermissionsJson!)!;
         Assert.Contains(permission, permissions);
-        Assert.DoesNotContain("users.manage", permissions);
+        Assert.Equal(role == Role.Manager, permissions.Contains("users.manage"));
     }
 
     [Theory]

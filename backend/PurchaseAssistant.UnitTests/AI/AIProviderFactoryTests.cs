@@ -8,6 +8,33 @@ namespace PurchaseAssistant.UnitTests.AI
 {
     public class AIProviderFactoryTests
     {
+        private sealed class CaptureHandler : HttpMessageHandler
+        {
+            public string? Key { get; private set; }
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+            {
+                Key = request.Headers.Authorization?.Parameter;
+                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent("{\"choices\":[{\"message\":{\"content\":\"candidate\"}}]}") });
+            }
+        }
+        [Fact]
+        public async Task ConfiguredBusinessKeyIsUsedByExistingProviderTransport()
+        {
+            var resolver = new Mock<IProviderCredentialResolver>(); resolver.Setup(x => x.ResolveAsync("openai_key", It.IsAny<CancellationToken>())).ReturnsAsync("business-test-key");
+            var handler = new CaptureHandler(); using var client = new HttpClient(handler);
+            var factory = new AIProviderFactory([], resolver.Object, _ => client);
+            var provider = await factory.GetProviderAsync(AIProviderType.OpenAI);
+            Assert.True((await provider.SendRequestAsync(new AIRequest("Test"))).Success); Assert.Equal("business-test-key", handler.Key);
+        }
+        [Fact]
+        public async Task MissingBusinessKeyPreservesServerFallbackAndStubNeverFabricatesSuccess()
+        {
+            var resolver = new Mock<IProviderCredentialResolver>(); resolver.Setup(x => x.ResolveAsync("openai_key", It.IsAny<CancellationToken>())).ReturnsAsync((string?)null);
+            var provider = new Mock<IAIProvider>(); provider.Setup(x => x.ProviderType).Returns(AIProviderType.OpenAI);
+            var factory = new AIProviderFactory([provider.Object], resolver.Object);
+            Assert.Same(provider.Object, await factory.GetProviderAsync(AIProviderType.OpenAI));
+            var stub = await new StubAIProvider().SendRequestAsync(new AIRequest("Test")); Assert.False(stub.Success); Assert.Null(stub.Content);
+        }
         [Theory]
         [InlineData(AIProviderType.OpenAI)]
         [InlineData(AIProviderType.Gemini)]

@@ -2,8 +2,17 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using PurchaseAssistant.Domain.Entities;
 namespace PurchaseAssistant.Infrastructure.Data.Configurations;
-public class SettingsConfiguration : IEntityTypeConfiguration<UserSettings>, IEntityTypeConfiguration<Business>
+public class SettingsConfiguration : IEntityTypeConfiguration<UserSettings>, IEntityTypeConfiguration<Business>, IEntityTypeConfiguration<ProviderCredential>
 {
+    public void Configure(EntityTypeBuilder<ProviderCredential> b)
+    {
+        b.Property(x => x.CredentialType).HasMaxLength(64);
+        b.Property(x => x.LastFour).HasMaxLength(4);
+        b.Property(x => x.Version).IsConcurrencyToken();
+        b.HasIndex(x => new { x.BusinessId, x.CredentialType }).IsUnique();
+        b.HasOne<Business>().WithMany().HasForeignKey(x => x.BusinessId).OnDelete(DeleteBehavior.Cascade);
+        b.HasOne<User>().WithMany().HasForeignKey(x => x.UpdatedById).OnDelete(DeleteBehavior.Restrict);
+    }
     public void Configure(EntityTypeBuilder<UserSettings> b)
     {
         b.HasIndex(x => new { x.BusinessId, x.UserId }).IsUnique();

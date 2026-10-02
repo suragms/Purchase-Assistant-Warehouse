@@ -3,6 +3,20 @@ using PurchaseAssistant.Domain.Common;
 
 namespace PurchaseAssistant.Domain.Entities
 {
+    public class StaffTask : TenantEntity
+    {
+        public Guid StaffId { get; set; }
+        public string TaskType { get; set; } = "general";
+        public string? ReferenceId { get; set; }
+        public string Status { get; set; } = "assigned";
+        public bool Rejected { get; set; }
+        public string? CorrectionNote { get; set; }
+        public DateTime AssignedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? AcceptedAt { get; set; }
+        public DateTime? CompletedAt { get; set; }
+        public Guid CreatedById { get; set; }
+        public Guid Version { get; set; } = Guid.NewGuid();
+    }
     /// <summary>
     /// Daily checklist task completion record.
     /// Tracks which staff member completed which task at what time.

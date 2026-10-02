@@ -36,6 +36,8 @@ namespace PurchaseAssistant.Infrastructure.Data
         public DbSet<PurchaseDamageReport> PurchaseDamageReports => Set<PurchaseDamageReport>();
         public DbSet<DailyUsageLog> DailyUsageLogs => Set<DailyUsageLog>();
         public DbSet<DailyOperationSnapshot> DailyOperationSnapshots => Set<DailyOperationSnapshot>();
+        public DbSet<BackupLog> BackupLogs => Set<BackupLog>();
+        public DbSet<AiUsageLog> AiUsageLogs => Set<AiUsageLog>();
 
         public Guid CurrentBusinessId => _tenantProvider?.GetBusinessId() ?? Guid.Empty;
 
@@ -43,6 +45,9 @@ namespace PurchaseAssistant.Infrastructure.Data
         {
             if (ChangeTracker.Entries<StockMovement>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
                 throw new InvalidOperationException("Stock movements are immutable. Record a correcting movement instead.");
+            if (ChangeTracker.Entries<BackupLog>().Any(e => e.State is EntityState.Modified or EntityState.Deleted)
+                || ChangeTracker.Entries<AiUsageLog>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+                throw new InvalidOperationException("Integration history is immutable.");
         }
 
         public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -63,7 +68,25 @@ namespace PurchaseAssistant.Infrastructure.Data
             modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
             ConfigureTenantRelationships(modelBuilder);
 
+            modelBuilder.Entity<BackupLog>(e => {
+                e.HasQueryFilter(x => x.BusinessId == CurrentBusinessId);
+                e.HasOne<Business>().WithMany().HasForeignKey(x => x.BusinessId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => new { x.BusinessId, x.CreatedAt });
+                e.Property(x => x.RunType).HasMaxLength(32); e.Property(x => x.Status).HasMaxLength(32);
+                e.Property(x => x.FilePath).HasMaxLength(128); e.Property(x => x.ErrorMessage).HasMaxLength(256);
+                e.Property(x => x.RowCountsJson).HasColumnType("jsonb");
+            });
+            modelBuilder.Entity<AiUsageLog>(e => {
+                e.HasQueryFilter(x => x.BusinessId == CurrentBusinessId);
+                e.HasOne<Business>().WithMany().HasForeignKey(x => x.BusinessId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => new { x.BusinessId, x.CreatedAt });
+                e.Property(x => x.Feature).HasMaxLength(64); e.Property(x => x.Endpoint).HasMaxLength(128);
+                e.Property(x => x.Provider).HasMaxLength(64); e.Property(x => x.Model).HasMaxLength(128);
+            });
+
             modelBuilder.Entity<UserSettings>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
+            modelBuilder.Entity<StaffTask>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
+            modelBuilder.Entity<ProviderCredential>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
             // Multi-tenant Query Filters
             modelBuilder.Entity<Category>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
             modelBuilder.Entity<CategoryType>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);

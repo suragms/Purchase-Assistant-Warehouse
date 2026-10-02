@@ -54,5 +54,23 @@ namespace PurchaseAssistant.Web.Controllers
         public async Task<IActionResult> Summary(DateTime? startDate, DateTime? endDate) => Ok(await _operationsService.GetChecklistSummaryAsync(startDate, endDate));
         [HttpGet("reports/summary")]
         public async Task<IActionResult> Report() => Ok(await _operationsService.GetOperationsReportSummaryAsync());
+        [HttpGet("usage/summary")]
+        public async Task<IActionResult> UsageSummary(DateTime? date) => Ok(await _operationsService.GetUsageSummaryAsync(date));
+        [HttpGet("snapshots")]
+        public async Task<IActionResult> Snapshots(DateTime? fromDate, DateTime? toDate, Guid? itemId) => Ok(await _operationsService.GetSnapshotsAsync(fromDate, toDate, itemId));
+        [HttpGet("tasks")]
+        public async Task<IActionResult> Tasks(string? status, Guid? staffId) => Ok(await _operationsService.GetStaffTasksAsync(status, staffId));
+        [HttpGet("tasks/assignees"), Authorize(Roles = "Owner,Admin,SuperAdmin")]
+        public async Task<IActionResult> Assignees() => Ok(await _operationsService.GetTaskAssigneesAsync());
+        [HttpPost("tasks"), Authorize(Roles = "Owner,Admin,SuperAdmin")]
+        public async Task<IActionResult> CreateTask(StaffTaskCreateDto dto) => Ok(await _operationsService.CreateStaffTaskAsync(dto));
+        [HttpPost("tasks/{id:guid}/accept")]
+        public async Task<IActionResult> AcceptTask(Guid id, StaffTaskActionDto dto) => Ok(await _operationsService.ActOnStaffTaskAsync(id, dto, true));
+        [HttpPost("tasks/{id:guid}/complete")]
+        public async Task<IActionResult> CompleteStaffTask(Guid id, StaffTaskActionDto dto) => Ok(await _operationsService.ActOnStaffTaskAsync(id, dto, false));
+        [HttpGet("tasks/performance"), Authorize(Roles = "Owner,Admin,SuperAdmin")]
+        public async Task<IActionResult> Performance() => Ok(await _operationsService.GetStaffPerformanceAsync());
+        [HttpGet("owner-dashboard"), Authorize(Roles = "Owner,Admin,SuperAdmin")]
+        public async Task<IActionResult> OwnerDashboard() => Ok(await _operationsService.GetOwnerDashboardAsync());
     }
 }

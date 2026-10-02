@@ -1,4 +1,6 @@
 import { purchaseErrorMessage } from '../../lib/purchaseValidation';
+import { useAuthStore } from '../../stores/authStore';
+import { purchaseSelectionCsv } from '../../api/exportsApi';
 import { formatMoney } from '../../lib/formatMoney';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -35,6 +37,9 @@ export default function PurchaseList() {
   const [search, setSearch] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<PurchaseStatus | undefined>(undefined);
   const [selectedSupplier, setSelectedSupplier] = useState<string>('');
+  const role = useAuthStore(s => s.user?.currentBusiness?.role);
+  const financialOwner = role === 'Owner' || role === 'SuperAdmin';
+  const [selected, setSelected] = useState<Set<string>>(new Set()), [copying, setCopying] = useState(false), [copyNotice, setCopyNotice] = useState(''), [copyError, setCopyError] = useState('');
 
   const { data: suppliersData } = useQuery({
     queryKey: supplierKeys.list(),
@@ -72,6 +77,12 @@ export default function PurchaseList() {
 
   return (
     <div className="space-y-6">
+      {copyNotice && <p role="status" className="text-emerald-800">{copyNotice}</p>}{copyError && <p role="alert" className="text-red-700">{copyError}</p>}
+      {financialOwner && <button className="rounded bg-emerald-800 text-white px-4 py-3 disabled:opacity-50" disabled={copying || isLoading || !selected.size} onClick={async () => {
+        setCopying(true); setCopyNotice(''); setCopyError('');
+        try { const csv = purchaseSelectionCsv((data?.data ?? []).filter(row => selected.has(row.id))); await navigator.clipboard.writeText(csv); setCopyNotice('Selected purchases copied as CSV.'); }
+        catch { setCopyError('Selected purchases could not be copied. Refresh the list and try again.'); } finally { setCopying(false); }
+      }}>Copy selected CSV</button>}
       {(statusMutation.error || deleteMutation.error) && <p role="alert" className="rounded-lg bg-red-50 p-4 text-red-700">{purchaseErrorMessage(statusMutation.error || deleteMutation.error)}</p>}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -148,6 +159,7 @@ export default function PurchaseList() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  {financialOwner && <th className="py-3 px-4"><input type="checkbox" aria-label="Select all purchases on this page" checked={!!data?.data.length && data.data.every(row => selected.has(row.id))} onChange={e => setSelected(e.target.checked ? new Set(data?.data.map(row => row.id)) : new Set())} /></th>}
                   <th className="py-3 px-4">Order #</th>
                   <th className="py-3 px-4">Supplier</th>
                   <th className="py-3 px-4">Status</th>
@@ -162,6 +174,7 @@ export default function PurchaseList() {
                   const statusInfo = statusLabels[po.status] || { label: 'Unknown', color: 'bg-slate-100 text-slate-700' };
                   return (
                     <tr key={po.id} className="hover:bg-slate-50/80 transition-colors">
+                      {financialOwner && <td className="py-3 px-4"><input type="checkbox" aria-label={'Select ' + po.orderNumber} checked={selected.has(po.id)} onChange={e => setSelected(current => { const next = new Set(current); if (e.target.checked) next.add(po.id); else next.delete(po.id); return next; })} /></td>}
                       <td className="py-3 px-4 font-medium text-slate-900">
                         <button
                           onClick={() => navigate(`/purchases/${po.id}`)}

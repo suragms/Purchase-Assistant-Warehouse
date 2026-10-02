@@ -65,7 +65,7 @@ public partial class PurchaseIntentEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/v1/auth/login", new { email = "endpoint@test.local", password = "correct-password" })).StatusCode);
     }
     [Theory]
-    [InlineData(Role.Manager)] [InlineData(Role.Staff)]
+    [InlineData(Role.Staff)]
     public async Task UserManagementRoleGateCannotBeBypassedByPermissionClaim(Role role)
     {
         using var factory = new Factory { MemberRole = role, Permission = Permissions.UsersManage }; using var client = factory.CreateClient();

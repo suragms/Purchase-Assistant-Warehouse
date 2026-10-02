@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Search, AlertTriangle, PackageX } from 'lucide-react';
 import { stockApi } from '../../api/stockApi';
 import type { StockItem } from '../../api/stockApi';
+import { CsvExportButton } from '../../components/CsvExportButton';
 import { stockKeys } from '../../lib/queryKeys';
 
 type StockFilter = 'all' | 'low-stock' | 'out-of-stock';
@@ -44,6 +45,7 @@ export default function StockList() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-[#0E4F46]">Inventory</h1>
+        <CsvExportButton kind={filter === 'low-stock' ? 'low-stock' : 'stock'} label={filter === 'low-stock' ? 'Low-stock CSV' : 'Stock CSV'} params={{ filter, search: search || undefined }} />
       </div>
 
       {/* Tabs */}

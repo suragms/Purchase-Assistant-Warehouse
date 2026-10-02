@@ -12,7 +12,7 @@ using Xunit;
 
 namespace PurchaseAssistant.UnitTests.Services;
 
-public class StubCurrentUserService : ICurrentUserService
+public class StaffRbacActor : ICurrentUserService
 {
     public Guid? UserId { get; set; }
     public string Email => "test@test.com";
@@ -25,7 +25,7 @@ public class StubCurrentUserService : ICurrentUserService
 public class UserServiceRBACStaffTests : IDisposable
 {
     private readonly AppDbContext _context;
-    private readonly StubCurrentUserService _currentUser;
+    private readonly StaffRbacActor _currentUser;
     private readonly UserService _sut;
     private readonly Guid _businessId = Guid.NewGuid();
     private readonly Guid _ownerUserId = Guid.NewGuid();
@@ -51,7 +51,7 @@ public class UserServiceRBACStaffTests : IDisposable
 
         _context.SaveChanges();
 
-        _currentUser = new StubCurrentUserService { BusinessId = _businessId };
+        _currentUser = new StaffRbacActor { BusinessId = _businessId };
         _sut = new UserService(_context, _currentUser);
     }
 

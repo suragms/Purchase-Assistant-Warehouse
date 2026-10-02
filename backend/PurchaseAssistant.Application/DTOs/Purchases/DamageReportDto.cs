@@ -8,7 +8,7 @@ public class CreateDamageReportDto
     public Guid PurchaseOrderId { get; set; }
     public Guid? CatalogItemId { get; set; }
     public string ItemName { get; set; } = string.Empty;
-    public decimal QtyDamaged { get; set; }
+    [OperationalNumeric] public decimal QtyDamaged { get; set; }
     public string? Unit { get; set; }
     public string DamageType { get; set; } = "damaged";
     public string? Reason { get; set; }
@@ -20,7 +20,7 @@ public class PurchaseDamageReportDto
     public Guid Id { get; set; }
     public Guid PurchaseOrderId { get; set; }
     public string ItemName { get; set; } = string.Empty;
-    public decimal QtyDamaged { get; set; }
+    [OperationalNumeric] public decimal QtyDamaged { get; set; }
     public string? Unit { get; set; }
     public string DamageType { get; set; } = string.Empty;
     public string? Status { get; set; }
