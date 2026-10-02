@@ -1,5 +1,57 @@
 # Reference full feature inventory
 
+## Implemented synthetic historical validator and zero-write preview
+
+Current checkpoint 2026-10-02; supersedes the design-only checkpoint and old “next task” below. VERIFIED_CODE/VERIFIED_TEST apply to the new validator/preview, not to future historical persistence or the reference runtime. The preceding historical field matrix remains the semantic authority and records proposed future fields, not added entities.
+
+### Architecture and input boundary
+
+`Application/Services/HistoricalMetadataValidator.cs` is a pure in-memory validator using report DTO/error conventions and OperationalNumeric classification. It has no DbContext, repository, StockService, transaction, audit, cache or write dependency. `Infrastructure/Services/HistoricalPreviewFixtures.cs` provides 44 fabricated cases and immutable fabricated target snapshots. `ExportsController.HistoricalPreview.cs` extends the existing exports owner. No schema/entity/migration/snapshot change was made.
+
+POST /api/v1/exports/historical/preview accepts exactly one property, `fixtureId`: valid / missing / conflicts / matching / provenance / mixed. Request limit 1 KiB; unknown selectors or extra properties (including caller tenant, provenance, real rows/files) return 400. The server creates the batch for the authenticated actor/selected business; preview queries no live warehouse entities. Authentication reads existing sessions/membership only. Response is no-store. There is no upload/confirmation/token/commit path and no preview/audit/history persistence.
+
+The typed synthetic input is `historical-metadata-v1`, Synthetic=true, scoped business UUID, up to 1000 rows / 1 MiB and an explicit source-to-target map. Each row contains source item identity, optional exact item code/barcode/UUID, explicit purchase/line/supplier UUIDs, original stock unit, ordered/received quantity scope and original source quantity; source calendar effective date, date meaning, currency/rate basis and optional selling-cost alias; field state/raw decimal or text/original allowed value/source cell; source/kind/import identifier/row identifier/source row/scoped actor/recorded time/optional original source time/prior correction revision/reason. These are synthetic validation structures, not an approved real file import format. Decimal values stay invariant strings until server validation; no financial arithmetic is delegated to UI.
+
+### Matching, fields, statuses and provenance
+
+- Exact case-sensitive source map, UUID/code/barcode identities must agree; parent/line/supplier relation must agree. Multiple candidates or contradictory known identities give AMBIGUOUS. Missing identity/relationship gives NOT_FOUND, malformed identity INVALID, foreign tenant/item/supplier/source map OUT_OF_SCOPE. No fuzzy matching or silent winner. Unresolved/foreign rows expose no target values or proposals.
+- Opening stock: nonnegative source numeric(12,3), including zero; original stock-event unit, calendar effective date and provenance required. Metadata proposal never changes current/physical stock or initializes a ledger.
+- Business date: strict valid yyyy-MM-dd and purchase_business_date meaning, agrees with explicit source effective date. Creation/invoice/receipt/completion timestamps cannot substitute; no timezone shift.
+- Selling rate: optional source numeric(12,2), INR per_purchase_quantity_unit; known zero stays zero. Conflicting selling-cost alias or undocumented currency/basis rejected; no fallback from cost or price, no financial total recalculation.
+- Historical name: original bounded nonblank Unicode (512), including Malayalam/Arabic/CJK/emoji; malformed Unicode/control/format characters rejected. No catalog rename or current-name substitution.
+- Historical unit: explicit reference-supported original label, no invented conversion; trim/case representation normalization only. Existing line Unit assertion-only; blank legacy native Unit or conflicting source/native label requires a separate correction contract. No default PCS.
+- Historical weight: positive source numeric(12,3) KgPerUnit agrees with existing native geometry, assertion-only. Source numeric(14,3) total weight must agree with explicit source quantity/scope and per-pack geometry. Original stock unit/ordered-or-received scope required for normalized quantity; no derivation from catalog/default/current geometry. Missing geometry remains null; a supplied total with missing/conflicting geometry is rejected.
+- Source precision is rejected, never rounded; native four-decimal data stays unchanged. Nonnegative source quantity maximum 999999999.999; rate 9999999999.99; total weight 99999999999.999.
+- KNOWN requires exact original allowed value and source cell. UNKNOWN remains null with WARNING; NOT_CAPTURED permits only optional fields; NOT_APPLICABLE permits only explicitly count-only source weight geometry. Required name/date/unit cannot become NOT_CAPTURED. A non-KNOWN value cannot carry a nonnull scalar. No missing value becomes zero, PCS, today, current name or current weight.
+- Source/kind/import/row/source row, scoped actor and offset timestamps are checked. Only SyntheticFixture source kind is accepted in this phase; absent/unknown/foreign source, missing/conflicting actor/original allowed value, invalid timestamps, unsupported fields and incomplete correction revisions are rejected. API accepts no caller credentials or arbitrary provenance. Every duplicate source row or import row is rejected, including exact repeats; no replay winner or idempotent write is selected.
+
+Field results include semantic State, validation Outcome, reason code/message, proposed source value, source cell/original allowed value. Row outcomes are VALID / WARNING / REJECTED / AMBIGUOUS / NOT_FOUND; matching OUT_OF_SCOPE and INVALID are rejected rows. Duplicate/out-of-scope counters are subsets of rejected rows. The five outcome counters sum to total rows. Blocked identity/provenance/duplicate rows have no proposed values. Unchanged synthetic current values are explicitly labeled and never treated as historical evidence. No successful result means data imported.
+
+### Synthetic fixture manifest (44 cases)
+
+| Suite | Cases |
+|---|---|
+| valid (11) | fully-valid; known-zero-rate; valid-name; valid-unit; valid-weight; unicode-name; decimal-quantity; decimal-rate; zero-opening-quantity; not-captured-rate; not-applicable-weight |
+| missing (6) | missing-opening; missing-date; missing-rate; missing-name; blank-unit; missing-weight |
+| conflicts (9) | conflicting-rate-alias; conflicting-unit; conflicting-geometry; negative-quantity; invalid-date; invalid-decimal; excess-precision; unclear-rate-basis; unknown-normalized-unit |
+| matching (7) | ambiguous-item-code; conflicting-barcode; item-not-found; cross-tenant-item; cross-tenant-supplier; cross-tenant-business; invalid-source-identifier |
+| provenance (11) | unknown-provenance; missing-source; missing-import-identifier; missing-row-identifier; missing-actor; conflicting-original-value; correction-without-reason; duplicate-source-row-a/b; duplicate-import-row-a/b |
+| mixed | All 44 above in one valid + warning + rejected + ambiguous + not-found batch |
+
+### Security, UI and zero-write evidence
+
+Existing RequireReportsView plus RequireCatalogEdit/RequirePurchaseEdit/RequirePurchaseView policies and an explicit Owner/scoped SuperAdmin role gate apply. Existing native Owner/SuperAdmin implicit permissions are preserved. Server membership overrides forged JWT claims; Manager/Admin/Staff cannot access preview. Foreign business without membership is denied; foreign source/item/supplier/batch identifiers are rejected. Invalid provenance is omitted from the result. No keys/passwords/tokens/storage paths are accepted as API provenance or exposed.
+
+Settings preserves the existing shell and branding: select synthetic fixture → Validate → row/field status, warnings/errors, provenance, original/proposed historical values, unchanged synthetic current values → STOP. Exact label: “Preview only — no data will be saved.” No Confirm/Commit control or real file picker. Pending requests disable repeated actions, failures allow retry, selecting another fixture clears results, membership/tenant changes discard or hide stale results.
+
+Six new PostgreSQL tests seed isolated fabricated businesses/entities, then compare every row/column and xmin in every table with BusinessId. Coverage includes CatalogItem/current/physical stock/units, nonempty immutable StockMovement, Purchases/PurchaseItems (Unit/KgPerUnit/stored totals), Suppliers/SupplierItems/SupplierItemPrices (native supplier-line equivalents), catalog relations, memberships, existing SecurityAuditLogs/BackupLogs/AiUsageLogs and other tenant histories. Native units are embedded fields, not a separate Unit entity/table. Actual EF targets are loaded with AsNoTracking in a SET TRANSACTION READ ONLY transaction; preview runs and the transaction commits. Fresh snapshots remain identical. Actual HTTP fixture previews for all six suites, Manager/Staff denials and invalid tenant membership also leave durable snapshots unchanged. Actual separately seeded foreign item/supplier/source matching exposes no foreign values. Setup and cleanup writes occur outside preview; no rollback is used to mask preview writes.
+
+76 focused backend tests cover fixtures, matching, null/zero/status/duplicate semantics, invalid decimals/dates/names/units/geometry, provenance, source map conflicts, legacy correction guards, deterministic immutable input, role/tenant guards, selector tampering and absence of historical confirm/commit/apply/execute routes. Twelve frontend tests and nineteen browser cases cover preview rendering, states/provenance/zeros/current values, failures, stale scope, roles, unsafe response flags and all six required screen sizes. Full regression evidence is in the current status checkpoint; physical-device testing remains unverified. No production/customer historical dataset was used.
+
+Historical persistence/import remains unavailable pending trusted source-to-target mapping and correction contracts.
+
+Exact next task: review a trusted source manifest, stable tenant/item/parent/line/supplier mapping, original event-unit and ordered/received scope, legacy selling aliases/basis and Unit/KgPerUnit correction decisions. Resolve these evidence gates before any separately authorized persistence schema, migration, opening-stock initialization or confirm phase. No automatic backfill is approved.
+
 Reference: https://github.com/ANANDU-2000/PurchaseAssiastant.git
 
 Branch: main; commit: `ab63ee73efeb537ca4e11afdccc160450c5356d6`; audit date: 2026-10-01 (Asia/Calcutta).

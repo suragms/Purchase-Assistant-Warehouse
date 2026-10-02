@@ -3,6 +3,23 @@ import { useAuthStore } from '../stores/authStore';
 import type { PurchaseOrderDto } from './purchaseApi';
 export type BackupLog = { id: string; runType: string; status: string; filePath?: string; sizeBytes?: number; rowCounts: Record<string, number>; durationMs?: number; errorMessage?: string; createdAt: string };
 export type DryRun = { valid: boolean; errors: string[]; rowCounts: Record<string, number>; writesPerformed: false; restoreEnabled: false };
+export type HistoricalField = { field: string; state: string; outcome: string; proposedValue: string | null; reasonCode: string; message: string; sourceCell: string | null; originalAllowedValue: string | null };
+export type HistoricalPreview = { businessId: string; label: string; synthetic: boolean; writesPerformed: boolean; persistenceAvailable: boolean; confirmationAvailable: boolean;
+  summary: { totalRows: number; validRows: number; warningRows: number; rejectedRows: number; ambiguousRows: number; notFoundRows: number; outOfScopeRows: number; duplicateRows: number };
+  rows: { rowIdentifier: string; case: string; match: string; outcome: string; duplicate: boolean; fields: HistoricalField[];
+    provenance: { sourceIdentifier: string; sourceKind: string; importIdentifier: string; rowIdentifier: string; sourceRowIdentifier: string; actor: string; recordedAt: string; sourceTimestamp: string | null; priorRevision: string | null; correctionReason: string | null } | null;
+    unchangedCurrentValues: Record<string, string | null>; reasons: string[] }[]; unchangedAreas: string[] };
+export const historicalFixtureSuites = { valid: 'Valid and zero values', missing: 'Missing historical facts', conflicts: 'Conflicting and invalid values', matching: 'Identity and tenant checks', provenance: 'Provenance and duplicates', mixed: 'All synthetic examples' };
+export async function previewHistoricalFixture(fixtureId: keyof typeof historicalFixtureSuites) {
+  const scope = backupDeviceKey(); const business = useAuthStore.getState().user?.currentBusiness;
+  if (!business || !['Owner', 'SuperAdmin'].includes(business.role)) throw new Error('Historical preview access is unavailable.');
+  const result = (await apiClient.post<HistoricalPreview>('/exports/historical/preview', { fixtureId })).data;
+  const current = useAuthStore.getState().user?.currentBusiness;
+  if (scope !== backupDeviceKey() || !current || !['Owner', 'SuperAdmin'].includes(current.role) || result.businessId !== current.businessId ||
+      result.synthetic !== true || result.writesPerformed !== false || result.persistenceAvailable !== false || result.confirmationAvailable !== false)
+    throw new Error('Preview scope changed or the response is unsafe. Try again.');
+  return result;
+}
 export const exportsApi = {
   history: async () => (await apiClient.get<{ items: BackupLog[] }>('/exports/backup/logs')).data.items,
   run: async () => (await apiClient.post<BackupLog>('/exports/backup/run')).data,

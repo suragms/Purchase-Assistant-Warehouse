@@ -1,6 +1,22 @@
 # Reference versus current gap matrix
 
-## Authoritative current checkpoint — 2026-10-02
+## Current checkpoint — synthetic preview implemented, persistence blocked
+
+This checkpoint supersedes the prior design-only phase and all earlier “next task” statements below. See [current verification](REFERENCE_IMPLEMENTATION_STATUS.md#current-checkpoint--synthetic-historical-validator-and-zero-write-preview) and [validator contract/fixtures](REFERENCE_FULL_FEATURE_INVENTORY.md#implemented-synthetic-historical-validator-and-zero-write-preview).
+
+| Gap | Current result | Remaining gate |
+|---|---|---|
+| Historical validator | IMPLEMENTED, pure read-only validator, six families plus original normalized-quantity scope, 44 synthetic cases | No trusted real dataset/map; API accepts only six curated fixture selectors |
+| Matching/provenance | Exact tenant identity/relationship checks, explicit outcomes, original allowed value/source cell, scoped actor/time/import/row/revision validation | Ambiguous/foreign/conflicting identities and duplicates rejected without a winner |
+| Null semantics | KNOWN / UNKNOWN / NOT_APPLICABLE / NOT_CAPTURED preserved independently from VALID/WARNING/REJECTED/AMBIGUOUS/NOT_FOUND | Missing facts remain null; current values never substitute; Unit/KgPerUnit correction blocked |
+| Zero-write API/UI | Owner/scoped SuperAdmin Settings selector → validate → review → STOP; POST /api/v1/exports/historical/preview | Manager/Admin/Staff denied; forged claims cannot elevate membership; no arbitrary uploads, commit/confirm/apply/execute, preview persistence, migration or backfill |
+| Persistence proof | Actual PostgreSQL matching/membership and complete tenant-table column/count/xmin snapshots, including embedded units and nonempty stock/purchase/supplier/audit/history records | Read-only transaction commits with identical durable state; HTTP success/denials unchanged; synthetic setup/cleanup outside preview |
+
+Historical persistence/import remains unavailable pending trusted source-to-target mapping and correction contracts.
+
+Exact next task: review the trusted source manifest/identifier map and correction decisions for legacy Unit/KgPerUnit, selling alias/basis and normalized-unit/quantity scope. Resolve evidence gates first; persistence, migrations, opening-stock initialization and confirmation require a separately authorized later phase. Production recovery rehearsal remains independent.
+
+## Prior checkpoint — before synthetic historical preview
 
 This section and [REFERENCE_IMPLEMENTATION_STATUS.md](REFERENCE_IMPLEMENTATION_STATUS.md) override older target status/verification claims below. The original matrix and previous checkpoints remain historical evidence, not the current product state. Reference source inspection is distinct from target test/runtime evidence.
 

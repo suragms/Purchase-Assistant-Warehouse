@@ -1,5 +1,26 @@
 # Warehouse Assistant — verified implementation status
 
+## Current checkpoint — synthetic historical validator and zero-write preview
+
+2026-10-02. This checkpoint supersedes the preceding design-only phase and its “next task”. Implemented **preview only**, with 44 fabricated cases. Existing Warehouse Assistant / Harisree Agency branding and workflows remain intact. Historical import/capture/persistence is not implemented.
+
+| Area | Implemented / evidence | Boundary |
+|---|---|---|
+| Validator | Pure Application `HistoricalMetadataValidator`, `historical-metadata-v1` DTOs, explicit source maps, immutable target snapshots | No DbContext/repository/StockService/transaction/audit/cache/persistence dependency |
+| API | POST /api/v1/exports/historical/preview; strict `{ "fixtureId": "mixed" }` selector; six suites; no-store response | No warehouse entity queries. Extra properties, business IDs, arbitrary rows/uploads, unknown fixtures return 400 |
+| Authorization | Existing selected-business session/membership checks; Owner/scoped SuperAdmin only; RequireReportsView + RequireCatalogEdit + RequirePurchaseEdit + RequirePurchaseView | Existing implicit privileged permissions preserved. Manager/Admin/Staff denied even with forged role/permission claims |
+| Matching | Exact tenant-scoped source map/UUID/code/barcode plus purchase/line/supplier agreement | MATCHED / AMBIGUOUS / NOT_FOUND / INVALID / OUT_OF_SCOPE; no fuzzy or cross-tenant selection |
+| Fields/provenance | Six historical families; original normalized-quantity scope; KNOWN/UNKNOWN/NOT_APPLICABLE/NOT_CAPTURED distinct from validation outcomes; source/actor/time/import/row/original allowed value/correction checks | Missing facts remain null, known zero survives, duplicates/conflicts rejected. Unit/KgPerUnit assertion-only; no financial recalculation or current-value substitution |
+| Settings UI | Select synthetic fixture → Validate → review outcomes, provenance, proposals and unchanged synthetic current values → STOP | “Preview only — no data will be saved.” No confirmation/commit control; stale scope/results discarded |
+| Zero writes | Six PostgreSQL tests compare every row/column/xmin across all BusinessId tables before/after; actual EF AsNoTracking entity matching inside SET TRANSACTION READ ONLY followed by commit | Catalog/current/physical stock, nonempty ledger, purchases/lines, supplier items/prices, embedded units, audit/backup/AI history identical. No rollback masks writes; HTTP preview/denials also unchanged |
+| Persistence | writesPerformed=false, persistenceAvailable=false, confirmationAvailable=false | No entity/model/migration, backfill, historical commit/confirm/apply/execute method/route, preview token/cache/storage or audit write |
+
+VERIFIED_TEST: backend build zero warnings/errors; 370 unit and 57 PostgreSQL tests (zero skips); frontend 91 tests. Full browser regression: 163 passed in 8.2 minutes (144 preserved + 19 new). Frontend production build and git diff --check PASS. Desktop 1366×768, 1440×900, 1920×1080 and mobile 390×844, 393×852, 412×915 verified in Edge for Owner/Manager/Staff, without horizontal overflow; scoped SuperAdmin recovery also passed. Physical-device testing remains unverified. Logs: TestResults/preview-backend-build.log, preview-backend-tests.log, preview-frontend-tests.log, preview-frontend-build.log, preview-browser-regression.log; PostgreSQL/unit TRX and browser screenshots are retained in ignored test output directories. PostgreSQL fixtures are fabricated and isolated; setup/cleanup occurs outside the measured preview interval. Initial test-account/cleanup defects were corrected and all seven first-run fixture businesses/dependents and three orphan fixture users removed. Production/customer historical records were not used. The previous 11 live browser checks remain prior-phase evidence; new UI browser checks use synthetic responses, with the actual API independently exercised against PostgreSQL.
+
+Historical persistence/import remains unavailable pending trusted source-to-target mapping and correction contracts.
+
+Exact next task: review a trusted source manifest and stable business/item/purchase/line/supplier identifier map; resolve original stock-event units, ordered/received scope, selling aliases/rate basis and separate legacy Unit/KgPerUnit correction decisions. Resolve these evidence gates before separately authorizing persistence design, migrations, stock initialization or confirmation. Synthetic maps are not real mappings. Detailed current contract: [inventory](REFERENCE_FULL_FEATURE_INVENTORY.md#implemented-synthetic-historical-validator-and-zero-write-preview).
+
 Checkpoint: 2026-10-02 (Asia/Calcutta). Reference: local reference-repo, pinned main commit ab63ee73efeb537ca4e11afdccc160450c5356d6. This checkpoint supersedes historical target statuses in the inventory and gap matrix. Reference source was inspected; its Python/Flutter suite was not executed. PASS means the described target contract passed the stated checks, not certification of the entire reference ERP or production deployment. Prior verified Harisree branding/login/PWA changes were preserved in this phase.
 
 Evidence labels: VERIFIED_CODE means inspected implementation; VERIFIED_TEST means executed passing checks; VERIFIED_RUNTIME means observed local API/browser/database behavior. DOCUMENTATION_CLAIM and ASSUMPTION are not proof; UNKNOWN/BLOCKED identifies absent contracts or unavailable environments. Preserved prior-phase PASS rows refer to their executed regression evidence, not reference runtime.
@@ -130,7 +151,7 @@ Decimal authority is preserved: up to four native stock/supplier quantity decima
 
 ## Trusted historical-data contract and safe import design
 
-This latest phase is design-only: the existing application and all CSV/export contracts remain unchanged. The full [historical field matrix and design](REFERENCE_FULL_FEATURE_INVENTORY.md#trusted-historical-data-contract--design-checkpoint-2026-10-02) distinguish inspected source (VERIFIED_CODE), proposed native mechanisms (DOCUMENTATION_CLAIM), missing original facts/identity maps (UNKNOWN/BLOCKED), and actual existing regression evidence. No application endpoint, importer UI, schema, migration, capture, correction or backfill was implemented.
+The preceding contract phase was design-only: the existing application and all CSV/export contracts remain unchanged. The full [historical field matrix and design](REFERENCE_FULL_FEATURE_INVENTORY.md#trusted-historical-data-contract--design-checkpoint-2026-10-02) distinguish inspected source (VERIFIED_CODE), proposed native mechanisms (DOCUMENTATION_CLAIM), missing original facts/identity maps (UNKNOWN/BLOCKED), and actual existing regression evidence. No application endpoint, importer UI, schema, migration, capture, correction or backfill was implemented.
 
 | Area | Established contract / design decision | Current evidence / implementation gate |
 |---|---|---|
@@ -150,13 +171,13 @@ Current design-phase regression reruns the unchanged application: full backend b
 
 Final design-phase checks: VERIFIED_TEST — 294 unit/endpoint + 51 PostgreSQL, zero skipped; 79 frontend tests in nine files; 144 ordinary browser tests passed in 8.2 minutes, including the three-role/six-size matrix. Backend build passed with zero warnings/errors; frontend production build passed. EF reports no changes since the last migration. Final git diff --check passed. File hashes confirm only the three required documents changed among 378 existing project files. No importer persistence, preview/confirm screen or production/physical-device behavior is certified by these regression results.
 
-## Remaining development
+## Prior remaining-development checkpoint (superseded above)
 
 1. Exact next task: Implement only a read-only historical-metadata-v1 validator/preview with isolated synthetic fixtures, explicit field states, deterministic source/target identity and role/policy checks, zero-persistence tests, unsafe-source/backfill rejection and responsive owner review. Keep confirm unavailable and generate no migration until a trusted historical source manifest/identifier map and a separate correction contract for legacy Unit/KgPerUnit are reviewed. Additive persistence/confirm is a later verified slice.
 2. Full export/Settings parity remains PARTIAL for missing historical data, native/source layout/schema and date/unit differences, Arabic help and absent WhatsApp delivery telemetry. Restore commit deliberately remains 501. Real OCR/correction learning remains UNKNOWN/BLOCKED; the source text parser is not image recognition.
 3. Rehearse both latest migrations and backup storage/retention/recovery against a production copy; verify persistent encryption keys, external provider availability and device/load performance. Production deployment, database rollback/recovery, actual nightly trigger and untested realtime event families remain unverified.
 
-## Working-tree file manifest
+## Prior-phase working-tree file manifest
 
 This manifest includes preserved branding/Operations/Settings/export/backup/CSV work and this historical contract documentation phase. Earlier changes were preserved; the listed paths are the current uncommitted work. No CSV or historical-contract schema migration was added.
 
