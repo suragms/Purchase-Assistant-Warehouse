@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Search, AlertTriangle, PackageX } from 'lucide-react';
 import { stockApi } from '../../api/stockApi';
@@ -12,7 +12,9 @@ type StockFilter = 'all' | 'low-stock' | 'out-of-stock';
 export default function StockList() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
-  const filter: StockFilter = (searchParams.get('filter') as StockFilter) ?? 'all';
+  const location = useLocation();
+  const requestedFilter = searchParams.get('filter') ?? location.pathname.split('/').at(-1);
+  const filter: StockFilter = requestedFilter === 'low-stock' || requestedFilter === 'out-of-stock' ? requestedFilter : 'all';
   const page = parseInt(searchParams.get('page') ?? '1', 10);
 
   const queryFn =
@@ -29,7 +31,7 @@ export default function StockList() {
       ? stockKeys.outOfStock({ page, search })
       : stockKeys.list({ page, search });
 
-  const { data, isLoading } = useQuery({ queryKey, queryFn });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey, queryFn });
 
   const setFilter = (f: StockFilter) => {
     setSearchParams({ filter: f, page: '1' });
@@ -79,7 +81,8 @@ export default function StockList() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      {isError && <p role="alert">Stock could not be loaded. <button className="underline" onClick={() => void refetch()}>Retry</button></p>}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
         {isLoading ? (
           <div className="flex justify-center py-16">
             <span className="animate-spin h-6 w-6 border-2 border-[#0E4F46] border-t-transparent rounded-full" />

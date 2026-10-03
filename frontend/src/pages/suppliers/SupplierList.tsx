@@ -6,8 +6,13 @@ import { supplierKeys } from '../../lib/queryKeys';
 import { PageHeader, Button, Card, Skeleton, ErrorState, ConfirmDialog, Modal, Input, Textarea, Badge } from '../../components/ui';
 import { useToast } from '../../components/ui/toastContext';
 import { CsvExportButton } from '../../components/CsvExportButton';
+import { SupplierHistory } from '../../components/SupplierHistory';
+import { useAuthStore } from '../../stores/authStore';
+import { hasPermission } from '../../auth/hasPermission';
 
 export default function SupplierList() {
+  const user = useAuthStore(s => s.user);
+  const [history, setHistory] = useState<Supplier | null>(null);
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -104,7 +109,7 @@ export default function SupplierList() {
         title="Suppliers"
         subtitle="Manage product suppliers"
         actions={
-          <Button icon={<Plus className="h-4 w-4" />} onClick={handleOpenNew}>New Supplier</Button>
+          hasPermission(user, 'supplier.create') && <Button icon={<Plus className="h-4 w-4" />} onClick={handleOpenNew}>New Supplier</Button>
         }
       />
 
@@ -136,16 +141,17 @@ export default function SupplierList() {
                     {s.isActive ? <Badge variant="green">Active</Badge> : <Badge variant="gray">Inactive</Badge>}
                   </td>
                   <td className="px-4 py-3 text-right space-x-2">
+                    {hasPermission(user, 'purchase.view') && <Button variant="ghost" size="sm" onClick={() => setHistory(s)}>History</Button>}
                     {s.isActive && <CsvExportButton kind="supplier" label="Purchase CSV" supplierId={s.id} />}
                     <Button variant="ghost" size="sm" aria-label={`Manage items for ${s.name}`} onClick={() => setSupplierForItems(s)}>
                       <Package className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(s)}>
+                    {hasPermission(user, 'supplier.edit') && <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(s)}>
                       <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => { setSupplierIdToDelete(s.id); setDeleteOpen(true); }}>
+                    </Button>}
+                    {hasPermission(user, 'supplier.delete') && <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => { setSupplierIdToDelete(s.id); setDeleteOpen(true); }}>
                       <Trash2 className="h-4 w-4" />
-                    </Button>
+                    </Button>}
                   </td>
                 </tr>
               ))}
@@ -161,6 +167,7 @@ export default function SupplierList() {
         )}
       </Card>
 
+      <Modal open={!!history} title={`Purchase history · ${history?.name ?? ''}`} onClose={() => setHistory(null)}>{history && <SupplierHistory key={history.id} id={history.id} />}</Modal>
       <Modal
         open={modalOpen}
         onClose={handleClose}

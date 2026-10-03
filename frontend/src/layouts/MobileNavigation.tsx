@@ -42,7 +42,7 @@ export function MobileNavigation({ user, items, onSearch, onLogout, onSelectBusi
   const groups = [
     { title: 'Operations', labels: ['Suppliers', 'Brokers', 'Daily Operations'] },
     { title: 'Catalog', labels: ['Catalog'] },
-    { title: 'Stock', labels: ['Inventory'] },
+    { title: 'Stock', labels: ['Inventory', 'Predictions'] },
     { title: 'Purchases', labels: ['Purchases'] },
     { title: 'Management', labels: ['Users'] },
   ].map(group => ({ title: group.title, links: items.filter(item => group.labels.includes(item.label)).flatMap(item => item.children

@@ -13,6 +13,23 @@ namespace PurchaseAssistant.Web.Controllers;
 [ApiController, Route("api/v1/settings"), Authorize(Policy = "RequireSelectedBusiness")]
 public class SettingsController(AppDbContext db, ICurrentUserService user, IBusinessLogoStorage logos, ProviderCredentialService credentials) : ControllerBase
 {
+    public record PasswordChange([property: System.ComponentModel.DataAnnotations.Required] string CurrentPassword,
+        [property: System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.MinLength(8), System.ComponentModel.DataAnnotations.MaxLength(72)] string NewPassword);
+    [HttpPost("password"), Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth")]
+    public async Task<IActionResult> ChangePassword(PasswordChange request, [FromServices] IPasswordHasher hasher, CancellationToken ct)
+    {
+        if (System.Text.Encoding.UTF8.GetByteCount(request.NewPassword) > 72 || System.Text.Encoding.UTF8.GetByteCount(request.CurrentPassword) > 72) return BadRequest(new { message = "Passwords may contain at most 72 UTF-8 bytes." });
+        var account = await db.Users.SingleOrDefaultAsync(x => x.Id == user.UserId, ct) ?? throw new KeyNotFoundException();
+        if (!hasher.VerifyPassword(request.CurrentPassword, account.PasswordHash)) return BadRequest(new { message = "Current password is incorrect." });
+        if (request.CurrentPassword == request.NewPassword) return BadRequest(new { message = "Choose a different new password." });
+        account.PasswordHash = hasher.HashPassword(request.NewPassword); account.UpdatedAt = DateTime.UtcNow;
+        var sessions = await db.RefreshTokens.Where(x => x.UserId == account.Id && x.RevokedAt == null).ToListAsync(ct);
+        foreach (var session in sessions) session.RevokedAt = DateTime.UtcNow;
+        db.SecurityAuditLogs.Add(new SecurityAuditLog { BusinessId = user.BusinessId!.Value, UserId = account.Id, EventType = "PasswordChanged", Description = "Password changed and all sessions revoked." });
+        await db.SaveChangesAsync(ct);
+        Response.Cookies.Delete("refreshToken");
+        return Ok(new { message = "Password changed. Sign in again on each device." });
+    }
     [HttpGet("profile")]
     public async Task<IActionResult> PersonalProfile()
     {

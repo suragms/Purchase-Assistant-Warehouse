@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="../../ml/PurchaseAssistant.ML/PurchaseAssistant.ML.csproj" />
     <ProjectReference Include="..\PurchaseAssistant.Application\PurchaseAssistant.Application.csproj" />
     <ProjectReference Include="..\PurchaseAssistant.Domain\PurchaseAssistant.Domain.csproj" />
   </ItemGroup>

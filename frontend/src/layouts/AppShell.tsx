@@ -29,6 +29,7 @@ export interface NavItem {
 const navItems: NavItem[] = [
   { label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" />, to: '/dashboard' },
   { label: 'Reports', permission: 'reports.view', icon: <BarChart3 className="h-4 w-4" />, to: '/reports' },
+  { label: 'Predictions', permission: 'stock.view', icon: <BarChart3 className="h-4 w-4" />, to: '/ml' },
   { label: 'Notifications', icon: <Bell className="h-4 w-4" />, to: '/notifications' },
   {
     label: 'Catalog', permission: 'catalog.view', icon: <Package className="h-4 w-4" />, children: [

@@ -62,6 +62,9 @@ namespace PurchaseAssistant.IntegrationTests.Stock
 
         public async Task DisposeAsync()
         {
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"MlPredictionLogs\" WHERE \"BusinessId\" = {0}", _businessId);
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"Notifications\" WHERE \"BusinessId\" = {0}", _businessId);
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"UserSettings\" WHERE \"BusinessId\" = {0}", _businessId);
             await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"SupplierItemPrices\" WHERE \"BusinessId\" = {0}", _businessId);
             await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"SupplierItems\" WHERE \"BusinessId\" = {0}", _businessId);
             await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"Memberships\" WHERE \"BusinessId\" = {0}", _businessId);

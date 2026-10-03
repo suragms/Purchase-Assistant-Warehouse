@@ -60,6 +60,9 @@ if (!string.IsNullOrWhiteSpace(keyRingPath))
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("ml", context => RateLimitPartition.GetSlidingWindowLimiter(
+        context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new SlidingWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 6, QueueLimit = 0 }));
     options.AddPolicy("auth", context => RateLimitPartition.GetSlidingWindowLimiter(
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new SlidingWindowRateLimiterOptions
         { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 6, QueueLimit = 0 }));
@@ -105,6 +108,8 @@ builder.Services.AddScoped<IPurchaseDamageService, PurchaseDamageService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddSingleton(new PurchaseAssistant.ML.ArtifactStore(builder.Configuration["ML:ArtifactPath"]));
+builder.Services.AddScoped<MlService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<BusinessBackupService>();
 builder.Services.AddScoped<IAIUsageRecorder, AiUsageRecorder>();
@@ -133,6 +138,8 @@ builder.Services.AddScoped<IAIProvider>(sp => new OpenRouterProvider(sp.GetRequi
 builder.Services.AddScoped<IAIProvider, StubAIProvider>();
 builder.Services.AddScoped<IAIProviderFactory>(sp => new AIProviderFactory(sp.GetServices<IAIProvider>(), sp.GetRequiredService<IProviderCredentialResolver>(), sp.GetRequiredService<IHttpClientFactory>().CreateClient));
 builder.Services.AddScoped<IAIRoutingService, AIRoutingService>();
+builder.Services.AddScoped<AiRuntimeSettings>();
+builder.Services.AddSingleton<AiCircuitBreaker>();
 
 // Database
 builder.Services.AddDbContext<AppDbContext>(options =>

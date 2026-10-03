@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PurchaseAssistant.Infrastructure.Data;
@@ -11,9 +12,11 @@ using PurchaseAssistant.Infrastructure.Data;
 namespace PurchaseAssistant.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261003094928_Phase3MlUsageAndMonitoring")]
+    partial class Phase3MlUsageAndMonitoring
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -193,10 +196,6 @@ namespace PurchaseAssistant.Infrastructure.Migrations
                     b.Property<string>("Address")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
-
-                    b.Property<string>("AiSettingsJson")
-                        .IsRequired()
-                        .HasColumnType("text");
 
                     b.Property<string>("BrandingLogoUrl")
                         .HasMaxLength(512)

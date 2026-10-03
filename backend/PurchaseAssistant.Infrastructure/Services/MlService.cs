@@ -1,0 +1,97 @@
+using Microsoft.EntityFrameworkCore;
+using PurchaseAssistant.Application.Interfaces;
+using PurchaseAssistant.Domain.Entities;
+using PurchaseAssistant.Infrastructure.Data;
+using PurchaseAssistant.ML;
+using System.Text.Json;
+using PurchaseAssistant.Application.DTOs;
+
+namespace PurchaseAssistant.Infrastructure.Services;
+
+public record HistoryPoint(DateOnly Date, [property: OperationalNumeric] double Quantity);
+public record ForecastMetrics([property: OperationalNumeric] double Mae, [property: OperationalNumeric] double Rmse, [property: OperationalNumeric] double? Wape);
+public record ForecastPoint(DateOnly Date, [property: OperationalNumeric] double Quantity, [property: OperationalNumeric] double Lower, [property: OperationalNumeric] double Upper);
+public record ReorderAdvice([property: OperationalNumeric] double Quantity, DateOnly? ReorderDate, string RiskCategory, string Reason);
+public record MovementAnomaly(Guid Id, DateTime Date, string Type, [property: OperationalNumeric] decimal Quantity, [property: OperationalNumeric] double Score, string Explanation);
+public record MlAnalysis(Guid ItemId, string ItemName, string Unit, [property: OperationalNumeric] decimal CurrentStock, string Status, string Message,
+    DateTime GeneratedAt, string? Model, string? ModelVersion, DateTime? TrainedAt, ForecastMetrics? Metrics,
+    List<HistoryPoint> History, List<ForecastPoint> Forecast, ReorderAdvice? Reorder, List<MovementAnomaly> Anomalies);
+public record PredictionOutcome(Guid Id, string ModelVersion, string InputVersion, DateTime CreatedAt, DateOnly StartDate, int Horizon,
+    [property: OperationalNumeric] decimal PredictedQuantity, [property: OperationalNumeric] decimal? ActualQuantity, int ObservedDays);
+
+public class MlService(AppDbContext db, ICurrentUserService user, ArtifactStore store, TimeProvider clock)
+{
+    private Guid Business => user.BusinessId ?? throw new UnauthorizedAccessException();
+    private void Check() { if (!user.HasPermission("stock.view") && user.Role is not ("Owner" or "SuperAdmin")) throw new UnauthorizedAccessException(); }
+    public async Task<MlAnalysis> AnalyzeAsync(Guid itemId, int horizon, CancellationToken ct)
+    {
+        Check(); if (horizon is not (7 or 14 or 30)) throw new ArgumentException("Use a forecast horizon of 7, 14 or 30 days.");
+        var now = clock.GetUtcNow().UtcDateTime; var today = DateOnly.FromDateTime(now);
+        var item = await db.CatalogItems.AsNoTracking().SingleOrDefaultAsync(x => x.BusinessId == Business && x.Id == itemId && x.IsActive, ct) ?? throw new KeyNotFoundException("Item not found.");
+        var from = today.AddDays(-730);
+        var rows = await db.DailyUsageLogs.AsNoTracking().Where(x => x.BusinessId == Business && x.CatalogItemId == itemId && x.Date >= from && x.Date < today)
+            .OrderBy(x => x.Date).Take(1500).Select(x => new UsageObservation(x.Date, (double?)x.UsedQty, x.IsConfirmed, x.LoggedAt)).ToListAsync(ct);
+        var data = UsageData.Prepare(rows, today, now); var anomalies = await AnomaliesAsync(itemId, now, ct);
+        var available = item.CurrentStock - item.ReservedStock;
+        var history = data.Series.TakeLast(60).Select(x => new HistoryPoint(x.Date, x.Quantity)).ToList();
+        MlAnalysis Empty(string status, string message) => new(item.Id, item.Name, item.DefaultUnit, available, status, message, now, null, null, null, null, history, [], null, anomalies);
+        if (data.Series.Count < UsageData.MinimumDays) return Empty("insufficient_history", $"Insufficient historical data to generate a reliable forecast. {data.Series.Count} of 120 consecutive confirmed daily usage records are available through yesterday.");
+        ModelArtifact? artifact;
+        try { artifact = await store.LoadAsync(Business, item.Id, ct); }
+        catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException) { return Empty("model_unavailable", "The model could not be loaded. Ask an administrator to validate or retrain it."); }
+        if (artifact == null) return Empty("model_missing", "No trained model is available for this item. An administrator must run the offline training process.");
+        if (!artifact.QualityAccepted) return Empty("quality_failed", "The trained model did not meet its baseline comparison. Forecasts are unavailable until retraining succeeds.");
+        if (artifact.Unit != item.DefaultUnit || artifact.TrainingEnd > today.AddDays(-1) || artifact.TrainedAt > now
+            || artifact.TrainingEnd < today.AddDays(-31)) return Empty("model_stale", "The model is stale or its unit has changed. Retraining is required.");
+        var overlap = data.Series.Where(x => x.Date >= artifact.TrainingStart && x.Date <= artifact.TrainingEnd).ToList();
+        if (UsageData.Fingerprint(overlap) != artifact.DatasetVersion) return Empty("history_changed", "Recorded training history has changed. Retraining is required.");
+        List<DailyValue> predicted;
+        try { predicted = ForecastModel.Predict(artifact.Model, data.Series, horizon); }
+        catch (Exception ex) when (ex is InvalidDataException or ArgumentException) { return Empty("prediction_failed", "A reliable forecast could not be calculated. Retraining is required."); }
+        var points = predicted.Select(x => new ForecastPoint(x.Date, Math.Round(x.Quantity, 4), Math.Round(Math.Max(0, x.Quantity - artifact.AbsoluteError90), 4), Math.Round(x.Quantity + artifact.AbsoluteError90, 4))).ToList();
+        var sum = points.Sum(x => x.Quantity); var lower = points.Sum(x => x.Lower); var upper = points.Sum(x => x.Upper);
+        var stock = (double)available; var buffer = (double)item.ReorderLevel;
+        var risk = stock <= 0 ? "out_of_stock" : stock < lower ? "high" : stock < sum ? "elevated" : stock < upper ? "possible" : "low";
+        double cumulative = 0; DateOnly? exhaustion = null;
+        foreach (var p in points) { cumulative += p.Quantity; if (exhaustion == null && cumulative + buffer >= stock) exhaustion = p.Date; }
+        var recommendation = new ReorderAdvice(Math.Round(Math.Max(0, sum + buffer - stock), 4), stock <= buffer ? today : exhaustion, risk,
+            $"Covers {horizon} days of forecast consumption plus the configured reorder threshold ({buffer:0.####} {item.DefaultUnit}), less available stock. Supplier lead time is unknown; the date is the projected threshold crossing, not a guaranteed order deadline. Risk categories compare stock with forecast scenarios, not calibrated probabilities. Bands use held-out absolute error and are not guaranteed coverage intervals.");
+        // One immutable snapshot per model/input/horizon/day; repeated reads do not flood history.
+        if (!await db.MlPredictionLogs.AnyAsync(x => x.BusinessId == Business && x.CatalogItemId == item.Id && x.StartDate == today && x.Horizon == horizon && x.ModelVersion == artifact.Version && x.InputVersion == data.Version, ct)) {
+            db.MlPredictionLogs.Add(new() { BusinessId = Business, CatalogItemId = item.Id, UserId = user.UserId!.Value, ModelVersion = artifact.Version,
+                InputVersion = data.Version, StartDate = today, Horizon = horizon, PredictedQuantity = (decimal)sum, DailyPredictionsJson = JsonSerializer.Serialize(points), CreatedAt = now });
+            await db.SaveChangesAsync(ct);
+        }
+        return new(item.Id, item.Name, item.DefaultUnit, available, "ready", "Forecasts support human review; they do not create purchases or change stock.", now,
+            artifact.Model.Name, artifact.Version, artifact.TrainedAt, new(artifact.TestMetrics.Mae, artifact.TestMetrics.Rmse, artifact.TestMetrics.Wape), history, points, recommendation, anomalies);
+    }
+    public async Task<List<MovementAnomaly>> AnomaliesAsync(Guid item, DateTime now, CancellationToken ct)
+    {
+        var start = now.AddDays(-180);
+        var movements = await db.StockMovements.AsNoTracking().Where(x => x.BusinessId == Business && x.CatalogItemId == item && x.CreatedAt >= start && x.CreatedAt <= now && x.QuantityDelta != 0)
+            .OrderByDescending(x => x.CreatedAt).ThenBy(x => x.Id).Take(2000).ToListAsync(ct);
+        var found = new List<MovementAnomaly>();
+        foreach (var row in movements.Where(x => x.CreatedAt >= now.AddDays(-30))) {
+            var prior = movements.Where(x => x.MovementType == row.MovementType && x.QuantityDelta * row.QuantityDelta > 0 && x.CreatedAt < row.CreatedAt).OrderByDescending(x => x.CreatedAt).Take(60).Select(x => Math.Abs((double)x.QuantityDelta)).Order().ToArray();
+            if (prior.Length < 20) continue;
+            var median = prior[prior.Length / 2]; var deviations = prior.Select(x => Math.Abs(x - median)).Order().ToArray();
+            var mad = deviations[deviations.Length / 2]; var quantity = Math.Abs((double)row.QuantityDelta);
+            // Degenerate constant histories have no estimated scale; use an explicit 3x historical-range rule.
+            var score = mad > 0 ? .67448975 * Math.Abs(quantity - median) / mad : 0;
+            if (score >= 3.5 || (mad == 0 && median > 0 && quantity > median * 3)) found.Add(new(row.Id, row.CreatedAt, row.MovementType, row.QuantityDelta, Math.Round(score, 2),
+                mad > 0 ? $"Quantity differs from the median of {prior.Length} earlier movements of the same type and direction (robust z-score {score:0.00}). Review the source transaction; this is not evidence of fraud." : "Quantity is more than three times the constant recent historical median. Review the source transaction; this is not evidence of fraud."));
+        }
+        return found.Take(50).ToList();
+    }
+    public async Task<object> MonitoringAsync(Guid itemId, CancellationToken ct)
+    {
+        Check(); if (!await db.CatalogItems.AnyAsync(x => x.Id == itemId && x.BusinessId == Business, ct)) throw new KeyNotFoundException();
+        var logs = await db.MlPredictionLogs.AsNoTracking().Where(x => x.BusinessId == Business && x.CatalogItemId == itemId).OrderByDescending(x => x.CreatedAt).Take(100).ToListAsync(ct);
+        var earliest = logs.Count == 0 ? DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime) : logs.Min(x => x.StartDate);
+        var usage = await db.DailyUsageLogs.AsNoTracking().Where(x => x.BusinessId == Business && x.CatalogItemId == itemId && x.IsConfirmed && x.Date >= earliest).ToListAsync(ct);
+        var today = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
+        return logs.Select(x => { var actual = usage.Where(y => y.Date >= x.StartDate && y.Date < x.StartDate.AddDays(x.Horizon) && y.Date < today).ToList();
+            return new PredictionOutcome(x.Id, x.ModelVersion, x.InputVersion, x.CreatedAt, x.StartDate, x.Horizon, x.PredictedQuantity,
+                actual.Select(y => y.Date).Distinct().Count() == x.Horizon ? (decimal?)actual.Sum(y => y.UsedQty) : null, actual.Count); }).ToList();
+    }
+}

@@ -1,4 +1,6 @@
 <Solution>
+  <Project Path="../ml/PurchaseAssistant.ML/PurchaseAssistant.ML.csproj" />
+  <Project Path="../ml/PurchaseAssistant.ML.Tool/PurchaseAssistant.ML.Tool.csproj" />
   <Project Path="PurchaseAssistant.Application/PurchaseAssistant.Application.csproj" />
   <Project Path="PurchaseAssistant.Contracts/PurchaseAssistant.Contracts.csproj" />
   <Project Path="PurchaseAssistant.Domain/PurchaseAssistant.Domain.csproj" />

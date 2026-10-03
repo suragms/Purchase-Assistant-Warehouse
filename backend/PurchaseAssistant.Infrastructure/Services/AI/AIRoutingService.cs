@@ -11,6 +11,8 @@ public class AIRoutingService : IAIRoutingService
     private readonly ILogger<AIRoutingService> _logger;
     private readonly AiOptions _aiOptions;
     private readonly IAIUsageRecorder? _usage;
+    private readonly AiRuntimeSettings? _settings;
+    private readonly AiCircuitBreaker? _circuit;
 
     // Define priority order
     private readonly AIProviderType[] _failoverOrder =
@@ -22,12 +24,13 @@ public class AIRoutingService : IAIRoutingService
         AIProviderType.Stub
     };
 
-    public AIRoutingService(IAIProviderFactory providerFactory, ILogger<AIRoutingService> logger, IOptions<AiOptions> aiOptions, IAIUsageRecorder? usage = null)
+    public AIRoutingService(IAIProviderFactory providerFactory, ILogger<AIRoutingService> logger, IOptions<AiOptions> aiOptions, IAIUsageRecorder? usage = null, AiRuntimeSettings? settings = null, AiCircuitBreaker? circuit = null)
     {
         _providerFactory = providerFactory;
         _logger = logger;
         _aiOptions = aiOptions.Value;
         _usage = usage;
+        _settings = settings; _circuit = circuit;
     }
 
     public async Task<AIResponse> ExecuteWithFailoverAsync(AIRequest request, CancellationToken ct = default)
@@ -38,15 +41,20 @@ public class AIRoutingService : IAIRoutingService
         }
 
         var attempts = 0; var watch = System.Diagnostics.Stopwatch.StartNew();
+        var policy = _settings == null ? new AiProviderPolicy() : await _settings.GetAsync(ct);
+        if (!policy.Enabled) return new AIResponse(false, null, "AI_DISABLED", "None", "None", 0);
         async Task<AIResponse> Record(AIResponse result) {
             if (_usage != null) try { await _usage.RecordAsync(result with { LatencyMs = watch.ElapsedMilliseconds }, attempts > 1, ct); }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                 catch (Exception) { _logger.LogWarning("AI usage metadata could not be recorded"); }
             return result;
         }
-        foreach (var providerType in _failoverOrder)
+        var order = _settings == null ? _failoverOrder : policy.ProviderOrder.Select(x => Enum.Parse<AIProviderType>(x)).ToArray();
+        foreach (var providerType in order)
         {
             ct.ThrowIfCancellationRequested();
+            var circuitKey = $"{_settings?.BusinessId}:{policy.Version}:{providerType}";
+            if (_circuit?.IsOpen(circuitKey) == true) continue;
             try
             {
                 var provider = await _providerFactory.GetProviderAsync(providerType, ct);
@@ -55,15 +63,25 @@ public class AIRoutingService : IAIRoutingService
                     _logger.LogInformation("Provider {Provider} is missing required credentials; skipping.", providerType);
                     continue;
                 }
-                attempts++;
-                var response = await provider.SendRequestAsync(request, ct);
+                AIResponse response = new(false, null, "AI_PROVIDER_FAILED", providerType.ToString(), "", 0);
+                for (var attempt = 0; attempt <= policy.Retries; attempt++) {
+                    attempts++;
+                    using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct); deadline.CancelAfter(TimeSpan.FromSeconds(policy.TimeoutSeconds));
+                    var configuredRequest = policy.Models.TryGetValue(providerType.ToString(), out var model) ? request with { ModelOverride = model } : request;
+                    try { response = await provider.SendRequestAsync(configuredRequest, deadline.Token); }
+                    catch (OperationCanceledException) when (!ct.IsCancellationRequested) { response = response with { Error = "AI_PROVIDER_TIMEOUT" }; }
+                    if (response.Success) break;
+                    if (attempt < policy.Retries) await Task.Delay(TimeSpan.FromMilliseconds(200), ct);
+                }
                 if (response.Success)
                 {
+                    _circuit?.Success(circuitKey);
                     _logger.LogInformation("AI Request succeeded using {Provider}", providerType);
                     return await Record(response);
                 }
 
                 _logger.LogWarning("AI Request failed using {Provider}", providerType);
+                _circuit?.Failure(circuitKey);
             }
             catch (NotSupportedException)
             {
@@ -72,6 +90,7 @@ public class AIRoutingService : IAIRoutingService
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
             catch (Exception)
             {
+                _circuit?.Failure(circuitKey);
                 _logger.LogWarning("Provider {Provider} unavailable", providerType);
             }
         }

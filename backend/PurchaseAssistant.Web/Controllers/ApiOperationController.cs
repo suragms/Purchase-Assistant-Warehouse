@@ -29,6 +29,7 @@ namespace PurchaseAssistant.Web.Controllers
         }
 
         [HttpGet("usage/today")]
+        [Authorize(Policy = "RequireStockView")]
         public async Task<ActionResult<UsageTodayDto>> GetTodayUsage()
             => Ok(await _operationsService.GetTodayUsageAsync());
 
@@ -53,10 +54,13 @@ namespace PurchaseAssistant.Web.Controllers
         [HttpGet("checklist/summary")]
         public async Task<IActionResult> Summary(DateTime? startDate, DateTime? endDate) => Ok(await _operationsService.GetChecklistSummaryAsync(startDate, endDate));
         [HttpGet("reports/summary")]
+        [Authorize(Policy = "RequireReportsView")]
         public async Task<IActionResult> Report() => Ok(await _operationsService.GetOperationsReportSummaryAsync());
         [HttpGet("usage/summary")]
+        [Authorize(Policy = "RequireStockView")]
         public async Task<IActionResult> UsageSummary(DateTime? date) => Ok(await _operationsService.GetUsageSummaryAsync(date));
         [HttpGet("snapshots")]
+        [Authorize(Policy = "RequireStockView")]
         public async Task<IActionResult> Snapshots(DateTime? fromDate, DateTime? toDate, Guid? itemId) => Ok(await _operationsService.GetSnapshotsAsync(fromDate, toDate, itemId));
         [HttpGet("tasks")]
         public async Task<IActionResult> Tasks(string? status, Guid? staffId) => Ok(await _operationsService.GetStaffTasksAsync(status, staffId));

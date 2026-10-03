@@ -6,13 +6,15 @@ using System.Reflection;
 
 namespace PurchaseAssistant.Infrastructure.Data
 {
-    public class AppDbContext : DbContext
+    public partial class AppDbContext : DbContext
     {
         private readonly ITenantProvider? _tenantProvider;
+        private readonly ICurrentUserService? _auditUser;
 
-        public AppDbContext(DbContextOptions<AppDbContext> options, ITenantProvider? tenantProvider = null) : base(options)
+        public AppDbContext(DbContextOptions<AppDbContext> options, ITenantProvider? tenantProvider = null, ICurrentUserService? auditUser = null) : base(options)
         {
             _tenantProvider = tenantProvider;
+            _auditUser = auditUser;
         }
 
         public DbSet<User> Users => Set<User>();
@@ -35,6 +37,7 @@ namespace PurchaseAssistant.Infrastructure.Data
         public DbSet<Notification> Notifications => Set<Notification>();
         public DbSet<PurchaseDamageReport> PurchaseDamageReports => Set<PurchaseDamageReport>();
         public DbSet<DailyUsageLog> DailyUsageLogs => Set<DailyUsageLog>();
+        public DbSet<MlPredictionLog> MlPredictionLogs => Set<MlPredictionLog>();
         public DbSet<DailyOperationSnapshot> DailyOperationSnapshots => Set<DailyOperationSnapshot>();
         public DbSet<BackupLog> BackupLogs => Set<BackupLog>();
         public DbSet<AiUsageLog> AiUsageLogs => Set<AiUsageLog>();
@@ -43,6 +46,9 @@ namespace PurchaseAssistant.Infrastructure.Data
 
         private void ProtectStockLedger()
         {
+            if (ChangeTracker.Entries<SecurityAuditLog>().Any(e => e.State is EntityState.Modified or EntityState.Deleted)
+                || ChangeTracker.Entries<MlPredictionLog>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+                throw new InvalidOperationException("Audit and prediction history are immutable.");
             if (ChangeTracker.Entries<StockMovement>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
                 throw new InvalidOperationException("Stock movements are immutable. Record a correcting movement instead.");
             if (ChangeTracker.Entries<BackupLog>().Any(e => e.State is EntityState.Modified or EntityState.Deleted)
@@ -52,14 +58,25 @@ namespace PurchaseAssistant.Infrastructure.Data
 
         public override int SaveChanges(bool acceptAllChangesOnSuccess)
         {
-            ProtectStockLedger();
-            return base.SaveChanges(acceptAllChangesOnSuccess);
+            return SaveChangesAsync(acceptAllChangesOnSuccess).GetAwaiter().GetResult();
         }
 
-        public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+        public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
         {
             ProtectStockLedger();
-            return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+            await using var transaction = Database.IsRelational() && Database.CurrentTransaction == null ? await Database.BeginTransactionAsync(cancellationToken) : null;
+            var notifications = await PrepareMutationRecordsAsync(cancellationToken);
+            if (!Database.IsRelational()) Notifications.AddRange(notifications);
+            var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+            // ON CONFLICT makes concurrent producers idempotent without aborting the domain mutation.
+            if (Database.IsRelational()) foreach (var n in notifications)
+                await Database.ExecuteSqlInterpolatedAsync($"""
+                    INSERT INTO "Notifications" ("Id", "BusinessId", "UserId", "Type", "Title", "Message", "IsRead", "CreatedAt", "ReferenceType", "ReferenceId", "DedupeKey")
+                    VALUES ({n.Id}, {n.BusinessId}, {n.UserId}, {n.Type.ToString()}, {n.Title}, {n.Message}, false, {n.CreatedAt}, {n.ReferenceType}, {n.ReferenceId}, {n.DedupeKey})
+                    ON CONFLICT DO NOTHING
+                    """, cancellationToken);
+            if (transaction != null) await transaction.CommitAsync(cancellationToken);
+            return result;
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -67,6 +84,15 @@ namespace PurchaseAssistant.Infrastructure.Data
             base.OnModelCreating(modelBuilder);
             modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
             ConfigureTenantRelationships(modelBuilder);
+            modelBuilder.Entity<MlPredictionLog>(e => {
+                e.HasQueryFilter(x => x.BusinessId == CurrentBusinessId);
+                e.HasOne<CatalogItem>().WithMany().HasForeignKey(x => new { x.BusinessId, x.CatalogItemId }).HasPrincipalKey(x => new { x.BusinessId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => new { x.BusinessId, x.CatalogItemId, x.CreatedAt });
+                e.Property(x => x.ModelVersion).HasMaxLength(160);
+                e.Property(x => x.InputVersion).HasMaxLength(64);
+                e.Property(x => x.PredictedQuantity).HasPrecision(20, 4);
+                e.Property(x => x.DailyPredictionsJson).HasColumnType("jsonb");
+            });
 
             modelBuilder.Entity<BackupLog>(e => {
                 e.HasQueryFilter(x => x.BusinessId == CurrentBusinessId);

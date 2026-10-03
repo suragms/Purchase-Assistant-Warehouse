@@ -33,7 +33,9 @@ const OperationsPage = React.lazy(() => import('../pages/OperationsPage'));
 const SettingsPage = React.lazy(() => import('../pages/SettingsPage'));
 const BackupPage = React.lazy(() => import('../pages/BackupPage'));
 const HelpGuidePage = React.lazy(() => import('../pages/HelpGuidePage'));
-const UsersPage = React.lazy(() => import('../pages/users/UsersPage'));
+const UsersPage = React.lazy(() => import('../pages/users/UsersPage'));
+const MlPage = React.lazy(() => import('../pages/MlPage'));
+const AuditPage = React.lazy(() => import('../pages/AuditPage'));
 
 export const AppRouter = () => {
   return (
@@ -80,7 +82,9 @@ export const AppRouter = () => {
                 <Route path="purchases/:id/edit" element={<PermissionRoute permission="purchase.edit"><PurchaseForm edit /></PermissionRoute>} />
 
                 {/* Reports & Analytics — Phase 7 */}
-                <Route path="reports" element={<PermissionRoute permission="reports.view"><ReportsDashboard /></PermissionRoute>} />
+                <Route path="reports" element={<PermissionRoute permission="reports.view"><ReportsDashboard /></PermissionRoute>} />
+                <Route path="ml" element={<PermissionRoute permission="stock.view"><MlPage /></PermissionRoute>} />
+                <Route path="audit" element={<PermissionRoute><AuditPage /></PermissionRoute>} />
 
                 {/* Notifications — Phase 6 */}
                 <Route path="notifications" element={<NotificationsPage />} />

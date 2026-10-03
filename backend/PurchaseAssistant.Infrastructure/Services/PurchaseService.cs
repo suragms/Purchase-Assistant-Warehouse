@@ -380,6 +380,7 @@ namespace PurchaseAssistant.Infrastructure.Services
 
             // Remove existing items and add updated ones
             _context.PurchaseItems.RemoveRange(order.Items);
+            _context.SupplierItemPrices.RemoveRange(await _context.SupplierItemPrices.Where(x => x.BusinessId == businessId && x.SourcePurchaseId == order.Id).ToListAsync());
             order.Items.Clear();
 
             decimal subtotal = 0;
@@ -476,7 +477,11 @@ namespace PurchaseAssistant.Infrastructure.Services
             var previousStatus = order.Status;
             order.Status = newStatus;
             order.UpdatedAt = now;
-            if (newStatus == PurchaseStatus.Confirmed) order.ConfirmedAt = now;
+            if (newStatus == PurchaseStatus.Confirmed) {
+                order.ConfirmedAt = now;
+                foreach (var line in order.Items) _context.SupplierItemPrices.Add(new SupplierItemPrice { BusinessId = businessId, SupplierId = order.SupplierId,
+                    CatalogItemId = line.CatalogItemId, Unit = line.Unit, Price = line.UnitPrice, PricePerKg = line.LandingCostPerKg, SourcePurchaseId = order.Id, EffectiveDate = now });
+            }
             else if (newStatus == PurchaseStatus.Dispatched) order.DispatchedAt = now;
             else if (newStatus == PurchaseStatus.Arrived) order.ArrivedAt = now;
             else if (newStatus == PurchaseStatus.Verified)

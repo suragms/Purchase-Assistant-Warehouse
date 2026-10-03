@@ -49,6 +49,8 @@ namespace PurchaseAssistant.Domain.Entities
     /// </summary>
     public class DailyUsageLog : TenantEntity
     {
+        /// <summary>Explicitly submitted consumption; generated snapshots are not observed zero demand.</summary>
+        public bool IsConfirmed { get; set; }
         /// <summary>The date this usage occurred (YYYY-MM-DD only)</summary>
         public DateOnly Date { get; set; }
 

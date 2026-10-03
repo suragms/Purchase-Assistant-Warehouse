@@ -51,6 +51,6 @@ public class BusinessEventFilter(BusinessEvents events) : IAsyncActionFilter
         if (controller == "StockController") { if (path.Contains("physical")) await events.Publish(business, "stock.physical_counted", itemId: entity); await events.Publish(business, "stock.changed", itemId: entity); }
         if (controller == "PurchaseController" && !path.EndsWith("preview")) { await events.Publish(business, "purchase.changed", purchaseId: entity); if (path.Contains("receive")) await events.Publish(business, "stock.changed", purchaseId: entity); }
         if (controller == "ApiOperationController" && path.EndsWith("usage")) await events.Publish(business, "stock.changed");
-        if (controller is "NotificationsController" or "DamageReportController") await events.Publish(business, "notification.changed");
+        if (controller is "NotificationsController" or "DamageReportController" or "StockController" or "PurchaseController" or "CatalogController" or "ApiOperationController" or "UsersController") await events.Publish(business, "notification.changed");
     }
 }

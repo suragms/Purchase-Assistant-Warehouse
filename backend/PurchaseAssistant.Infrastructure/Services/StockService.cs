@@ -55,7 +55,7 @@ namespace PurchaseAssistant.Infrastructure.Services
         {
             page = Math.Clamp(page, 1, 10000);
             pageSize = Math.Clamp(pageSize, 1, 100);
-            var query = GetBaseQuery();
+            var query = GetBaseQuery().Where(x => x.IsActive);
 
             if (!string.IsNullOrWhiteSpace(search))
             {

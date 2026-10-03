@@ -118,6 +118,7 @@ public class OperationsService(AppDbContext db, ICurrentUserService user, IStock
             var delta = (log?.UsedQty ?? 0) - line.QuantityUsed;
             if (log == null) { log = new DailyUsageLog { BusinessId = Business, CatalogItemId = item.Id, Date = Today, OpeningQty = Math.Max(0, item.CurrentStock - purchased.GetValueOrDefault(item.Id)), LoggedByUserId = User }; db.Add(log); }
             log.PurchasedQty = purchased.GetValueOrDefault(item.Id);
+            log.IsConfirmed = true;
             log.UsedQty = line.QuantityUsed; log.ClosingQty = item.CurrentStock + delta; log.Notes = line.Notes; log.LoggedAt = DateTime.UtcNow; log.LoggedByUserId = User;
             if (delta != 0) await stock.AdjustStockAsync(item.Id, new AdjustStockRequestDto { QuantityDelta = delta, ExpectedVersion = line.ExpectedVersion, Reason = "Daily usage log", Notes = line.Notes, ReferenceType = "DailyUsage", ReferenceId = log.Id.ToString() });
         }

@@ -9,6 +9,7 @@ import { catalogApi } from '../../api/catalogApi';
 import { purchaseKeys, dashboardKeys, reportKeys } from '../../lib/queryKeys';
 import { ShoppingBag, Plus, Trash2, ArrowLeft, Save } from 'lucide-react';
 import { PurchaseAssistant } from '../../components/AI/PurchaseAssistant';
+import { SupplierPriceSuggestion } from '../../components/SupplierPriceSuggestion';
 import { useToast } from '../../components/ui/toastContext';
 import { isValidQuantity, MAX_PURCHASE_VALUE, purchaseErrorMessage } from '../../lib/purchaseValidation';
 import type { PurchaseIntentItemCandidateDto } from '../../api/purchaseIntentApi';
@@ -341,6 +342,7 @@ function PurchaseFormContent({ edit, id, existingOrder }: { edit: boolean; id?: 
                     onChange={(e) => handleItemChange(index, 'unitPrice', parseFloat(e.target.value) || 0)}
                     className="w-full min-w-0 px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
+                  <SupplierPriceSuggestion supplierId={supplierId} itemId={item.catalogItemId} unit={item.unit ?? 'PCS'} onApply={price => handleItemChange(index, 'unitPrice', price)} />
                 </div>
 
                 <div className="md:col-span-2">

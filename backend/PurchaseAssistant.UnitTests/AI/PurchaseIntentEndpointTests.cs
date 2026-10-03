@@ -45,6 +45,7 @@ public partial class PurchaseIntentEndpointTests
             builder.UseEnvironment("Testing");
             builder.UseSetting("Jwt:SecretKey", Key);
             builder.UseSetting("BACKUP_DIR", BackupDirectory);
+            builder.UseSetting("ML:ArtifactPath", Path.Combine(BackupDirectory, "models"));
             builder.ConfigureServices(services => {
                 services.RemoveAll<IPurchaseParsingService>(); services.AddSingleton(Parser.Object);
                 services.RemoveAll<IPurchaseService>(); services.AddSingleton(Purchases.Object);

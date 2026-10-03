@@ -72,6 +72,7 @@ namespace PurchaseAssistant.IntegrationTests.Purchases
 
         public async Task DisposeAsync()
         {
+            await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"SupplierItemPrices\" WHERE \"BusinessId\" = {0}", _businessId);
             await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"CatalogVariants\" WHERE \"BusinessId\" = {0}", _businessId);
             await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"PurchaseItems\" WHERE \"BusinessId\" = {0}", _businessId);
             await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"SecurityAuditLogs\" WHERE \"BusinessId\" = {0}", _businessId);

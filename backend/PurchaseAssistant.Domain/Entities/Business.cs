@@ -15,6 +15,7 @@ namespace PurchaseAssistant.Domain.Entities
         public string? ContactEmail { get; set; }
         public Guid Version { get; set; } = Guid.NewGuid();
         public bool IsActive { get; set; } = true;
+        public string AiSettingsJson { get; set; } = "{}";
 
         public ICollection<Membership> Memberships { get; set; } = new List<Membership>();
     }
