@@ -26,7 +26,7 @@ export const exportsApi = {
   dryRun: async (payload: unknown) => (await apiClient.post<DryRun>('/exports/restore/dry-run', { payload })).data,
 };
 export type CsvKind = 'stock' | 'low-stock' | 'supplier' | 'report-suppliers' | 'report-items';
-export async function downloadCsv(kind: CsvKind, params: { search?: string; filter?: string; start?: string; end?: string } = {}, supplierId?: string) {
+export async function downloadCsv(kind: CsvKind, params: { search?: string; filter?: string; start?: string; end?: string; categoryId?: string; supplierId?: string; severity?: string } = {}, supplierId?: string) {
   const scope = backupDeviceKey();
   const financial = ['supplier', 'report-suppliers', 'report-items'].includes(kind);
   const owner = () => ['Owner', 'SuperAdmin'].includes(useAuthStore.getState().user?.currentBusiness?.role ?? '');

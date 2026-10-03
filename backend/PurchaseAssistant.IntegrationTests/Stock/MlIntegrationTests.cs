@@ -71,7 +71,7 @@ public partial class StockServiceIntegrationTests
         _context.Memberships.Add(new Membership { BusinessId = _businessId, UserId = _userId, Role = Role.Owner });
         _context.Add(new UserSettings { BusinessId = _businessId, UserId = _userId, NotificationsEnabled = false }); await _context.SaveChangesAsync();
         await using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(ConnectionString).Options, _tenant, _user);
-        await new StockService(db, _user).AdjustStockAsync(item.Id, new() { QuantityDelta = -10, ExpectedVersion = item.RowVersion });
+        await new StockService(db, _user).AdjustStockAsync(item.Id, new() { QuantityDelta = -10, ExpectedVersion = item.RowVersion, Reason = "Notification settings test" });
         Assert.Empty(await db.Notifications.ToListAsync()); Assert.NotEmpty(await db.SecurityAuditLogs.ToListAsync());
     }
 }

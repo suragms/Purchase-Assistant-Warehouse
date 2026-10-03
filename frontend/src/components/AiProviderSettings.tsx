@@ -5,7 +5,11 @@ import { purchaseErrorMessage } from '../lib/purchaseValidation';
 
 interface Policy { enabled: boolean; providerOrder: string[]; models: Record<string, string>; timeoutSeconds: number; retries: number; version: string }
 export function AiProviderSettings() {
-  const query = useQuery({ queryKey: ['settings', 'ai'], queryFn: async () => (await apiClient.get<Policy>('/settings/ai')).data });
+  const query = useQuery({ queryKey: ['settings', 'ai'], queryFn: async () => {
+    const value = (await apiClient.get<Policy>('/settings/ai')).data;
+    if (!value || !Array.isArray(value.providerOrder) || !value.models || typeof value.enabled !== 'boolean') throw new Error('Invalid AI routing response.');
+    return value;
+  } });
   const [draft, setDraft] = useState<Policy | null>(null); const [notice, setNotice] = useState('');
   const save = useMutation({ mutationFn: async (policy: Policy) => (await apiClient.put<Policy>('/settings/ai', policy)).data, onSuccess: () => { setDraft(null); setNotice('AI routing saved.'); void query.refetch(); } });
   const value = draft ?? query.data;

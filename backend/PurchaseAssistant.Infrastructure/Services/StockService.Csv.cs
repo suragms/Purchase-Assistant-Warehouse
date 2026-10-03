@@ -17,13 +17,13 @@ public partial class StockService
         "KGS" or "KILOGRAM" or "KILOGRAMS" => "KG", "PIECE" or "PIECES" => "PCS",
         "BAGS" or "SACK" or "SACKS" => "BAG", "BOXES" => "BOX", "TINS" => "TIN", var value => value
     };
-    public async Task<List<StockCsvRow>> GetCsvRowsAsync(string filter, string? search, DateTime? start, DateTime? end, Guid[]? ids, CancellationToken ct)
+    public async Task<List<StockCsvRow>> GetCsvRowsAsync(string filter, string? search, DateTime? start, DateTime? end, Guid[]? ids, CancellationToken ct, Guid? categoryId = null, Guid? supplierId = null, string? severity = null)
     {
         CsvRange(ref start, ref end);
         if (filter is not ("all" or "low-stock" or "out-of-stock") || search?.Length > 200 || ids?.Length > 5000 || ids?.Contains(Guid.Empty) == true)
             throw new ArgumentException("Check the stock export filters.");
         var business = _currentUser.BusinessId ?? throw new UnauthorizedAccessException();
-        var query = GetBaseQuery().Where(x => x.IsActive).Include(x => x.Type).Include(x => x.LastSupplier).AsNoTracking();
+        var query = FilterStock(GetBaseQuery().Where(x => x.IsActive).Include(x => x.Type).Include(x => x.LastSupplier).AsNoTracking(), categoryId, supplierId, severity);
         if (ids != null)
         {
             if (ids.Length == 0) throw new ArgumentException("Select at least one item.");

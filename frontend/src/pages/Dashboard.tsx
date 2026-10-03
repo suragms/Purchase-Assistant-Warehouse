@@ -1,3 +1,5 @@
+import { useAuthStore } from '../stores/authStore';
+import { hasPermission } from '../auth/hasPermission';
 import { formatMoney } from '../lib/formatMoney';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -19,6 +21,9 @@ import {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const user = useAuthStore(s => s.user);
+  const canPurchase = hasPermission(user, 'purchase.view'), canStock = hasPermission(user, 'stock.view');
+  const canCreate = hasPermission(user, 'purchase.create'), canFinance = ['Owner', 'SuperAdmin'].includes(user?.currentBusiness?.role ?? '');
 
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: dashboardKeys.summary(),
@@ -71,20 +76,9 @@ export default function Dashboard() {
     );
   }
 
-  const pMetrics = data?.purchaseMetrics || {
-    todayPurchasesCount: 0,
-    pendingPurchasesCount: 0,
-    activePurchasesCount: 0,
-    completedPurchasesCount: 0,
-    totalPurchaseSpend: 0,
-  };
-
-  const sMetrics = data?.stockMetrics || {
-    totalCatalogItems: 0,
-    lowStockCount: 0,
-    outOfStockCount: 0,
-    itermsWithPhysicalVariance: 0,
-  };
+  if (!data?.purchaseMetrics || !data?.stockMetrics) return <div><PageHeader title="Dashboard" /><p role="alert">Dashboard data is unavailable. <button onClick={() => void refetch()}>Retry</button></p></div>;
+  const pMetrics = data.purchaseMetrics;
+  const sMetrics = data.stockMetrics;
 
   const alerts = data?.operationalAlerts || [];
   const recentPurchases = data?.recentPurchases || [];
@@ -105,12 +99,12 @@ export default function Dashboard() {
             <RefreshCw className={`w-4 h-4 text-slate-500 ${isRefetching ? 'animate-spin' : ''}`} />
             Refresh
           </button>
-          <button
+          {canCreate && <button
             onClick={() => navigate('/purchases/new')}
             className="inline-flex items-center gap-2 px-4 py-2 bg-[#0E4F46] hover:bg-[#0E4F46]/90 text-white font-medium rounded-lg text-sm transition-colors shadow-sm"
           >
             <ShoppingBag className="w-4 h-4" /> New Purchase
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -135,7 +129,7 @@ export default function Dashboard() {
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Total Spend */}
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between hover:shadow-md transition-shadow">
+        {canPurchase && canFinance && <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between hover:shadow-md transition-shadow">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Purchase Spend</p>
             <p className="text-2xl font-bold text-slate-900 mt-1">
@@ -146,10 +140,10 @@ export default function Dashboard() {
           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
             <DollarSign className="w-6 h-6" />
           </div>
-        </div>
+        </div>}
 
         {/* Card 2: Today's / Active Purchases */}
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between hover:shadow-md transition-shadow">
+        {canPurchase && <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between hover:shadow-md transition-shadow">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Active Purchases</p>
             <p className="text-2xl font-bold text-indigo-600 mt-1">{pMetrics.activePurchasesCount}</p>
@@ -158,10 +152,10 @@ export default function Dashboard() {
           <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
             <ShoppingBag className="w-6 h-6" />
           </div>
-        </div>
+        </div>}
 
         {/* Card 3: Stock Health - Low Stock */}
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between hover:shadow-md transition-shadow">
+        {canStock && <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between hover:shadow-md transition-shadow">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Low Stock Items</p>
             <p className={`text-2xl font-bold mt-1 ${sMetrics.lowStockCount > 0 ? 'text-amber-600' : 'text-slate-900'}`}>
@@ -172,10 +166,10 @@ export default function Dashboard() {
           <div className={`p-3 rounded-xl ${sMetrics.lowStockCount > 0 ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-600'}`}>
             <AlertTriangle className="w-6 h-6" />
           </div>
-        </div>
+        </div>}
 
         {/* Card 4: Catalog & Inventory Items */}
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between hover:shadow-md transition-shadow">
+        {canStock && <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between hover:shadow-md transition-shadow">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Catalog Items</p>
             <p className="text-2xl font-bold text-slate-900 mt-1">{sMetrics.totalCatalogItems}</p>
@@ -184,13 +178,14 @@ export default function Dashboard() {
           <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
             <Package className="w-6 h-6" />
           </div>
-        </div>
+        </div>}
+
       </div>
 
       {/* Recent Purchases & Stock Activity Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Purchases Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+        {canPurchase && <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
           <div className="p-5 border-b border-slate-200 flex items-center justify-between">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <ShoppingBag className="w-4 h-4 text-[#0E4F46]" />
@@ -218,7 +213,7 @@ export default function Dashboard() {
                     <th className="py-3 px-4">Order #</th>
                     <th className="py-3 px-4">Supplier</th>
                     <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4 text-right">Total</th>
+                    {canFinance && <th className="py-3 px-4 text-right">Total</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
@@ -233,22 +228,22 @@ export default function Dashboard() {
                       <td className="py-3 px-4">
                         <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-xs font-medium px-2.5 py-0.5 rounded-full">
                           <Clock className="w-3 h-3" />
-                          {po.status === 0 ? 'Draft' : po.status === 1 ? 'Confirmed' : po.status === 2 ? 'Dispatched' : po.status === 3 ? 'Arrived' : po.status === 4 ? 'Verified' : 'Cancelled'}
+                          {po.status === 0 ? 'Draft' : po.status === 1 ? 'Confirmed' : po.status === 2 ? 'Dispatched' : po.status === 3 ? 'Arrived' : po.status === 4 ? 'Verified' : po.status === 5 ? 'Completed' : 'Cancelled'}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-right font-semibold text-slate-900">
+                      {canFinance && <td className="py-3 px-4 text-right font-semibold text-slate-900">
                         {formatMoney(po.grandTotal)}
-                      </td>
+                      </td>}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Recent Stock Activity */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+        {canStock && <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
           <div className="p-5 border-b border-slate-200 flex items-center justify-between">
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <Activity className="w-4 h-4 text-[#0E4F46]" />
@@ -305,7 +300,8 @@ export default function Dashboard() {
               </table>
             </div>
           )}
-        </div>
+        </div>}
+
       </div>
     </div>
   );

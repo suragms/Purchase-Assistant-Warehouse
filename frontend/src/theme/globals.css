@@ -1,6 +1,15 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../../tailwind.config.js";
+
+/* Preserve the existing v3 border, placeholder, focus and shadow appearance. */
+@layer base {
+  *, ::before, ::after, ::backdrop { border-color: #e5e7eb; }
+  input::placeholder, textarea::placeholder { color: #9ca3af; opacity: 1; }
+  button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
+}
+@utility shadow-sm { --tw-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow); }
+@utility outline-none { outline: 2px solid transparent; outline-offset: 2px; }
+@utility break-words { overflow-wrap: break-word; }
 
 @layer base {
   body {

@@ -39,6 +39,7 @@ public partial class PurchaseIntentEndpointTests
         public Mock<IGlobalSearchService> Search { get; } = new();
         public Mock<IReportService> Reports { get; } = new();
         public bool RealCsvReports { get; set; }
+        public bool RealDashboard { get; set; }
         public Mock<IDashboardService> Dashboard { get; } = new();
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -53,7 +54,9 @@ public partial class PurchaseIntentEndpointTests
                 services.RemoveAll<IReportService>();
                 if (RealCsvReports) services.AddScoped<IReportService, PurchaseAssistant.Infrastructure.Services.ReportService>();
                 else services.AddSingleton(Reports.Object);
-                services.RemoveAll<IDashboardService>(); services.AddSingleton(Dashboard.Object);
+                services.RemoveAll<IDashboardService>();
+                if (RealDashboard) services.AddScoped<IDashboardService, PurchaseAssistant.Infrastructure.Services.DashboardService>();
+                else services.AddSingleton(Dashboard.Object);
                 services.RemoveAll<DbContextOptions<AppDbContext>>();
                 services.RemoveAll<IDbContextOptionsConfiguration<AppDbContext>>();
                 services.AddDataProtection().UseEphemeralDataProtectionProvider();

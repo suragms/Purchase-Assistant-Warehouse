@@ -57,12 +57,14 @@ export const stockApi = {
   getItems: async (
     page = 1,
     pageSize = 50,
-    search?: string
+    search?: string,
+    filters?: { categoryId?: string; supplierId?: string; severity?: string }
   ): Promise<PaginatedResult<StockItem>> => {
     const params = new URLSearchParams();
     params.append('page', page.toString());
     params.append('pageSize', pageSize.toString());
     if (search) params.append('search', search);
+    for (const [key, value] of Object.entries(filters ?? {})) if (value) params.append(key, value);
     const res = await apiClient.get(`/stock?${params.toString()}`);
     return res.data;
   },
@@ -70,12 +72,14 @@ export const stockApi = {
   getLowStock: async (
     page = 1,
     pageSize = 50,
-    search?: string
+    search?: string,
+    filters?: { categoryId?: string; supplierId?: string; severity?: string }
   ): Promise<PaginatedResult<StockItem>> => {
     const params = new URLSearchParams();
     params.append('page', page.toString());
     params.append('pageSize', pageSize.toString());
     if (search) params.append('search', search);
+    for (const [key, value] of Object.entries(filters ?? {})) if (value) params.append(key, value);
     const res = await apiClient.get(`/stock/low-stock?${params.toString()}`);
     return res.data;
   },
@@ -83,12 +87,14 @@ export const stockApi = {
   getOutOfStock: async (
     page = 1,
     pageSize = 50,
-    search?: string
+    search?: string,
+    filters?: { categoryId?: string; supplierId?: string; severity?: string }
   ): Promise<PaginatedResult<StockItem>> => {
     const params = new URLSearchParams();
     params.append('page', page.toString());
     params.append('pageSize', pageSize.toString());
     if (search) params.append('search', search);
+    for (const [key, value] of Object.entries(filters ?? {})) if (value) params.append(key, value);
     const res = await apiClient.get(`/stock/out-of-stock?${params.toString()}`);
     return res.data;
   },

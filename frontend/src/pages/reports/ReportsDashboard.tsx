@@ -1,4 +1,7 @@
 import { ExportControls } from '../../components/ExportControls';
+import { ServerDownload } from '../../components/ServerDownload';
+import { useAuthStore } from '../../stores/authStore';
+import { hasPermission } from '../../auth/hasPermission';
 import { formatMoney } from '../../lib/formatMoney';
 import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -11,6 +14,7 @@ import {
 import { PageHeader } from '../../components/ui';
 
 export default function ReportsDashboard() {
+  const user = useAuthStore(s => s.user);
   const [activeTab, setActiveTab] = useState<'spend' | 'summary' | 'stock' | 'comparison'>('spend');
   const [dateRange, setDateRange] = useState<'30' | '90' | '365'>('30');
   const [groupBy, setGroupBy] = useState<'day' | 'month'>('day');
@@ -23,26 +27,27 @@ export default function ReportsDashboard() {
     return { startDate: start.toISOString(), endDate: end.toISOString() };
   }, [dateRange, reportAnchor]);
 
-  const { data: spendData, isLoading: spendLoading } = useQuery({
+  const { data: spendData, isLoading: spendLoading, error: spendError, refetch: retrySpend } = useQuery({
     queryKey: reportKeys.spend({ startDate, endDate, groupBy }),
     queryFn: () => reportApi.getSpendAnalytics(startDate, endDate, groupBy),
   });
 
-  const { data: summaryData, isLoading: summaryLoading } = useQuery({
+  const { data: summaryData, isLoading: summaryLoading, error: summaryError, refetch: retrySummary } = useQuery({
     queryKey: reportKeys.summary({ startDate, endDate }),
     queryFn: () => reportApi.getPurchaseSummary(startDate, endDate),
   });
 
-  const { data: stockData, isLoading: stockLoading } = useQuery({
+  const { data: stockData, isLoading: stockLoading, error: stockError, refetch: retryStock } = useQuery({
     queryKey: reportKeys.stock(),
     queryFn: () => reportApi.getStockAnalytics(),
   });
 
-  const { data: comparisonData } = useQuery({
+  const { data: comparisonData, error: comparisonError, refetch: retryComparison } = useQuery({
     queryKey: reportKeys.comparison({ startDate, endDate }),
     queryFn: () => reportApi.getPeriodComparison(startDate, endDate),
   });
 
+  if (spendError || summaryError || stockError || comparisonError) return <div className="space-y-4"><PageHeader title="Reports & Analytics" /><p role="alert">Reports could not be loaded. <button className="underline p-3" onClick={() => { void retrySpend(); void retrySummary(); void retryStock(); void retryComparison(); }}>Retry</button></p></div>;
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -68,6 +73,7 @@ export default function ReportsDashboard() {
       </div>
 
       <ExportControls start={startDate} end={endDate} />
+      {hasPermission(user, 'stock.view') && <ServerDownload path="/exports/movements.csv" filename="movements.csv" label="Stock activity CSV" params={{ start: startDate, end: endDate }} />}
       {/* Period Comparison Metric Cards */}
       {comparisonData && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -101,7 +107,7 @@ export default function ReportsDashboard() {
       )}
 
       {/* Tabs */}
-      <div className="border-b border-slate-200 flex space-x-6">
+      <div className="border-b border-slate-200 flex flex-wrap gap-4">
         <button
           onClick={() => setActiveTab('spend')}
           className={`pb-3 text-sm font-semibold transition-colors border-b-2 ${

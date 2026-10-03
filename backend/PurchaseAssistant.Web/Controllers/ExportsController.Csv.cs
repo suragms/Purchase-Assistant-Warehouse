@@ -16,17 +16,17 @@ public partial class ExportsController
     private static ExportFileBuilder.CsvNumber ReportDisplay(decimal value) => Math.Abs(value - decimal.Round(value, 0, MidpointRounding.AwayFromZero)) < 0.001m
         ? new(decimal.Round(value, 0, MidpointRounding.AwayFromZero), "#,0") : new(decimal.Round(value, 2, MidpointRounding.AwayFromZero), "0.0#");
     [HttpGet("stock.csv"), Authorize(Policy = "RequireStockView")]
-    public async Task<IActionResult> StockCsv(string filter = "all", string? search = null, DateTime? start = null, DateTime? end = null, [FromQuery] Guid[]? ids = null, CancellationToken ct = default)
+    public async Task<IActionResult> StockCsv(string filter = "all", string? search = null, DateTime? start = null, DateTime? end = null, [FromQuery] Guid[]? ids = null, CancellationToken ct = default, Guid? categoryId = null, Guid? supplierId = null, string? severity = null)
     {
-        var rows = await stockService.GetCsvRowsAsync(filter, search, start, end, ids, ct);
+        var rows = await stockService.GetCsvRowsAsync(filter, search, start, end, ids, ct, categoryId, supplierId, severity);
         return await Download(ExportFileBuilder.Csv(["Item", "Category", "Subcategory", "Unit", "Current Stock", "Opening Stock", "Purchased", "Reorder Level", "Last Updated"],
             rows.Select(x => new object?[] { x.Name, x.Category, x.Subcategory, x.Unit, x.Current, null, x.Purchased, x.Reorder,
                 x.LastMovement?.ToString("O", CultureInfo.InvariantCulture) })), "text/csv; charset=utf-8", "harisree_stock_export.csv");
     }
     [HttpGet("low-stock.csv"), Authorize(Policy = "RequireStockView")]
-    public async Task<IActionResult> LowStockCsv(string? search = null, DateTime? start = null, DateTime? end = null, [FromQuery] Guid[]? ids = null, CancellationToken ct = default)
+    public async Task<IActionResult> LowStockCsv(string? search = null, DateTime? start = null, DateTime? end = null, [FromQuery] Guid[]? ids = null, CancellationToken ct = default, Guid? categoryId = null, Guid? supplierId = null, string? severity = null)
     {
-        var rows = await stockService.GetCsvRowsAsync("low-stock", search, start, end, ids, ct);
+        var rows = await stockService.GetCsvRowsAsync("low-stock", search, start, end, ids, ct, categoryId, supplierId, severity);
         return await Download(ExportFileBuilder.Csv(["name", "subcategory", "unit", "system_stock", "physical_stock", "reorder", "purchased", "status", "supplier"],
             rows.Select(x => new object?[] { x.Name, x.Subcategory ?? x.Category, x.Unit, StockDisplay(x.Current, x.Unit), StockDisplay(x.Physical, x.Unit),
                 x.Reorder > 0 ? StockDisplay(x.Reorder, x.Unit) : null, x.Purchased > 0 ? StockDisplay(x.Purchased.Value, x.Unit) : null, x.Status, x.Supplier })),

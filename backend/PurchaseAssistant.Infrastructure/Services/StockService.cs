@@ -51,11 +51,12 @@ namespace PurchaseAssistant.Infrastructure.Services
         }
 
         public async Task<PaginatedResult<StockItemDto>> GetStockItemsAsync(
-            int page, int pageSize, string? search, bool? lowStockOnly, bool? outOfStockOnly)
+            int page, int pageSize, string? search, bool? lowStockOnly, bool? outOfStockOnly, Guid? categoryId = null, Guid? supplierId = null, string? severity = null)
         {
             page = Math.Clamp(page, 1, 10000);
             pageSize = Math.Clamp(pageSize, 1, 100);
-            var query = GetBaseQuery().Where(x => x.IsActive);
+            if (search?.Length > 200) throw new ArgumentException("Search is limited to 200 characters.");
+            var query = FilterStock(GetBaseQuery().AsNoTracking().Where(x => x.IsActive), categoryId, supplierId, severity);
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -79,7 +80,7 @@ namespace PurchaseAssistant.Infrastructure.Services
 
             var total = await query.CountAsync();
             var items = await query
-                .OrderBy(i => i.Name)
+                .OrderBy(i => i.Name).ThenBy(i => i.Id)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();

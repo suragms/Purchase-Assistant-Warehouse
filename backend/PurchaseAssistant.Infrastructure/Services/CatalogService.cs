@@ -320,11 +320,15 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<List<DuplicateCandidateDto>> GetDuplicateCandidatesAsync(int? minSimilarity = 70)
         {
+            if (minSimilarity is < 0 or > 100) throw new ArgumentException("Similarity must be between 0 and 100.");
             var activeItems = await _context.CatalogItems
+                .AsNoTracking()
                 .Include(i => i.Category)
                 .Include(i => i.Type)
                 .Where(i => i.IsActive)
+                .OrderBy(i => i.Id).Take(2001)
                 .ToListAsync();
+            if (activeItems.Count > 2000) throw new ArgumentException("Duplicate review supports up to 2,000 active items. Use catalog search to review a larger catalog.");
 
             var duplicates = new List<DuplicateCandidateDto>();
             var threshold = minSimilarity ?? 70;

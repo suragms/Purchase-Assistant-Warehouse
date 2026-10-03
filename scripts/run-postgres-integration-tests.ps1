@@ -75,12 +75,18 @@ try {
     $portListener.Start()
     $port = ([System.Net.IPEndPoint]$portListener.LocalEndpoint).Port
     $portListener.Stop()
-    Invoke-CheckedNative $resolvedTools['pg_ctl'] @(
-        '--pgdata', $dataDirectory,
-        '--options', "-h 127.0.0.1 -p $port -c listen_addresses=127.0.0.1",
-        '--log', $serverLog,
-        '--wait', 'start'
-    ) 'PostgreSQL startup'
+    # PostgreSQL outlives pg_ctl. Explicit file handles avoid an inherited output
+    # pipe keeping PowerShell redirection open until the server shuts down.
+    $startupOutput = Join-Path $clusterRoot 'startup.log'
+    $startupError = Join-Path $clusterRoot 'startup-error.log'
+    $startup = Start-Process -FilePath $resolvedTools['pg_ctl'] -ArgumentList @(
+        '--pgdata', "`"$dataDirectory`"",
+        '--options', "`"-h 127.0.0.1 -p $port -c listen_addresses=127.0.0.1`"",
+        '--log', "`"$serverLog`"", '--wait', 'start'
+    ) -WindowStyle Hidden -PassThru -RedirectStandardOutput $startupOutput -RedirectStandardError $startupError
+    $startup.WaitForExit()
+    if ($startup.ExitCode -ne 0) { throw "PostgreSQL startup failed with exit code $($startup.ExitCode)." }
+    Get-Content -LiteralPath $startupOutput
     $serverStarted = $true
 
     $sql = "CREATE ROLE wa_test_runner LOGIN PASSWORD '$runnerPassword';" + [System.Environment]::NewLine +

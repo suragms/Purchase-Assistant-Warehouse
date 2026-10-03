@@ -24,9 +24,9 @@ namespace PurchaseAssistant.Web.Controllers
         public async Task<ActionResult<PaginatedResult<StockItemDto>>> GetStockItems(
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 50,
-            [FromQuery] string? search = null)
+            [FromQuery] string? search = null, [FromQuery] Guid? categoryId = null, [FromQuery] Guid? supplierId = null, [FromQuery] string? severity = null)
         {
-            var result = await _stockService.GetStockItemsAsync(page, pageSize, search, false, false);
+            var result = await _stockService.GetStockItemsAsync(page, pageSize, search, false, false, categoryId, supplierId, severity);
             return Ok(result);
         }
 
@@ -35,9 +35,9 @@ namespace PurchaseAssistant.Web.Controllers
         public async Task<ActionResult<PaginatedResult<StockItemDto>>> GetLowStockItems(
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 50,
-            [FromQuery] string? search = null)
+            [FromQuery] string? search = null, [FromQuery] Guid? categoryId = null, [FromQuery] Guid? supplierId = null, [FromQuery] string? severity = null)
         {
-            var result = await _stockService.GetStockItemsAsync(page, pageSize, search, true, false);
+            var result = await _stockService.GetStockItemsAsync(page, pageSize, search, true, false, categoryId, supplierId, severity);
             return Ok(result);
         }
 
@@ -46,9 +46,9 @@ namespace PurchaseAssistant.Web.Controllers
         public async Task<ActionResult<PaginatedResult<StockItemDto>>> GetOutOfStockItems(
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 50,
-            [FromQuery] string? search = null)
+            [FromQuery] string? search = null, [FromQuery] Guid? categoryId = null, [FromQuery] Guid? supplierId = null, [FromQuery] string? severity = null)
         {
-            var result = await _stockService.GetStockItemsAsync(page, pageSize, search, false, true);
+            var result = await _stockService.GetStockItemsAsync(page, pageSize, search, false, true, categoryId, supplierId, severity);
             return Ok(result);
         }
 

@@ -14,19 +14,30 @@ namespace PurchaseAssistant.Infrastructure.Services
     public class NotificationService : INotificationService
     {
         private readonly AppDbContext _context;
+        private readonly ICurrentUserService? _user;
 
-        public NotificationService(AppDbContext context)
+        public NotificationService(AppDbContext context, ICurrentUserService? user = null)
         {
             _context = context;
+            _user = user;
+        }
+
+        private IQueryable<Notification> Visible(Guid userId)
+        {
+            var query = _context.Notifications.Where(n => n.UserId == userId);
+            if (_user == null || _user.Role is "Owner" or "SuperAdmin") return query;
+            bool stock = _user.HasPermission("stock.view"), purchase = _user.HasPermission("purchase.view"), staff = _user.HasPermission("users.view");
+            return query.Where(n => ((n.Type == NotificationType.LowStock || n.Type == NotificationType.OutOfStock || n.Type == NotificationType.StockVariance || n.ReferenceType == "MlPrediction") && stock)
+                || (n.ReferenceType == "Membership" && staff)
+                || ((n.Type == NotificationType.PurchasePending || n.Type == NotificationType.VerificationRequired || n.Type == NotificationType.DeliveryPending) && purchase)
+                || (n.Type == NotificationType.System && n.ReferenceType != "MlPrediction" && n.ReferenceType != "Membership"));
         }
 
         public async Task<PaginatedResult<NotificationDto>> GetNotificationsAsync(Guid userId, int page, int pageSize, bool onlyUnread)
         {
             page = Math.Clamp(page, 1, 10000);
             pageSize = Math.Clamp(pageSize, 1, 100);
-            var query = _context.Notifications
-                .AsNoTracking()
-                .Where(n => n.UserId == userId);
+            var query = Visible(userId).AsNoTracking();
 
             if (onlyUnread)
             {
@@ -68,14 +79,14 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<int> GetUnreadCountAsync(Guid userId)
         {
-            return await _context.Notifications
+            return await Visible(userId)
                 .Where(n => n.UserId == userId && !n.IsRead)
                 .CountAsync();
         }
 
         public async Task MarkAsReadAsync(Guid notificationId, Guid userId)
         {
-            var notification = await _context.Notifications
+            var notification = await Visible(userId)
                 .FirstOrDefaultAsync(n => n.Id == notificationId && n.UserId == userId);
 
             if (notification != null && !notification.IsRead)
@@ -88,7 +99,7 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task MarkAllAsReadAsync(Guid userId)
         {
-            var unreadNotifications = await _context.Notifications
+            var unreadNotifications = await Visible(userId)
                 .Where(n => n.UserId == userId && !n.IsRead)
                 .ToListAsync();
 
@@ -133,9 +144,13 @@ namespace PurchaseAssistant.Infrastructure.Services
                 CreatedAt = DateTime.UtcNow
             };
 
-            _context.Notifications.Add(notification);
-            try { await _context.SaveChangesAsync(); }
-            catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException { SqlState: "23505" }) { _context.Entry(notification).State = EntityState.Detached; }
+            if (_context.Database.IsRelational()) {
+                await _context.Database.ExecuteSqlInterpolatedAsync($"""
+                    INSERT INTO "Notifications" ("Id", "BusinessId", "UserId", "Type", "Title", "Message", "IsRead", "CreatedAt", "ReferenceType", "ReferenceId", "DedupeKey")
+                    VALUES ({notification.Id}, {businessId}, {userId}, {type.ToString()}, {title}, {message}, false, {notification.CreatedAt}, {referenceType}, {referenceId}, {notification.DedupeKey})
+                    ON CONFLICT DO NOTHING
+                    """);
+            } else { _context.Notifications.Add(notification); await _context.SaveChangesAsync(); }
         }
     }
 }

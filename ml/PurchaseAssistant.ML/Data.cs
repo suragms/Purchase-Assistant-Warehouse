@@ -18,7 +18,8 @@ public static class UsageData
         var valid = rows.Where(x => x.Confirmed && x.Date < asOf && x.Date >= asOf.AddDays(-730)
             && x.Quantity is >= 0 and <= 1_000_000_000 && double.IsFinite(x.Quantity.Value)
             && x.RecordedAt != default && x.RecordedAt <= extractedAt
-            && DateOnly.FromDateTime(x.RecordedAt) == x.Date).ToList();
+            && DateOnly.FromDateTime(x.RecordedAt) == x.Date)
+            .Select(x => x with { Quantity = Math.Round(x.Quantity!.Value, 4, MidpointRounding.AwayFromZero) }).ToList();
         var groups = valid.GroupBy(x => x.Date).ToList();
         // Daily entries are cumulative. Identical duplicates collapse; conflicting duplicates are unknown.
         var days = groups.Where(g => g.Select(x => x.Quantity).Distinct().Count() == 1)
@@ -34,5 +35,5 @@ public static class UsageData
             duplicateCount, missing, Fingerprint(suffix));
     }
     public static string Fingerprint(IEnumerable<DailyValue> values) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
-        string.Join("\n", values.Select(x => $"{x.Date:yyyy-MM-dd},{x.Quantity.ToString("R", CultureInfo.InvariantCulture)}"))))).ToLowerInvariant();
+        string.Join("\n", values.Select(x => $"{x.Date:yyyy-MM-dd},{Math.Round(x.Quantity, 4, MidpointRounding.AwayFromZero).ToString("F4", CultureInfo.InvariantCulture)}"))))).ToLowerInvariant();
 }

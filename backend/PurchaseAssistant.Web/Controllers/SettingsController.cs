@@ -13,8 +13,8 @@ namespace PurchaseAssistant.Web.Controllers;
 [ApiController, Route("api/v1/settings"), Authorize(Policy = "RequireSelectedBusiness")]
 public class SettingsController(AppDbContext db, ICurrentUserService user, IBusinessLogoStorage logos, ProviderCredentialService credentials) : ControllerBase
 {
-    public record PasswordChange([property: System.ComponentModel.DataAnnotations.Required] string CurrentPassword,
-        [property: System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.MinLength(8), System.ComponentModel.DataAnnotations.MaxLength(72)] string NewPassword);
+    public record PasswordChange([System.ComponentModel.DataAnnotations.Required] string CurrentPassword,
+        [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.MinLength(8), System.ComponentModel.DataAnnotations.MaxLength(72)] string NewPassword);
     [HttpPost("password"), Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth")]
     public async Task<IActionResult> ChangePassword(PasswordChange request, [FromServices] IPasswordHasher hasher, CancellationToken ct)
     {

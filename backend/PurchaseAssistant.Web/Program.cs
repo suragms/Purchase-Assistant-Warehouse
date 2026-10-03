@@ -139,6 +139,9 @@ builder.Services.AddScoped<IAIProvider, StubAIProvider>();
 builder.Services.AddScoped<IAIProviderFactory>(sp => new AIProviderFactory(sp.GetServices<IAIProvider>(), sp.GetRequiredService<IProviderCredentialResolver>(), sp.GetRequiredService<IHttpClientFactory>().CreateClient));
 builder.Services.AddScoped<IAIRoutingService, AIRoutingService>();
 builder.Services.AddScoped<AiRuntimeSettings>();
+builder.Services.AddScoped<WhatsAppDeliveryService>();
+builder.Services.AddScoped<InvoiceTextService>();
+builder.Services.AddHttpClient("WhatsApp", c => c.Timeout = TimeSpan.FromSeconds(45)).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false }).RemoveAllLoggers();
 builder.Services.AddSingleton<AiCircuitBreaker>();
 
 // Database

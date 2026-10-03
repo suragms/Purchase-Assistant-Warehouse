@@ -1,4 +1,5 @@
 import { formatMoney } from '../../lib/formatMoney';
+import { WhatsAppDelivery } from '../../components/WhatsAppDelivery';
 import PurchasePayment from './PurchasePayment';
 import DamageReportSection from '../../components/damage/DamageReportSection';
 import { useState } from 'react';
@@ -99,6 +100,7 @@ export default function PurchaseDetail() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
+      {['Owner', 'SuperAdmin'].includes(business?.role ?? '') && order.status !== PurchaseStatus.Draft && order.status !== PurchaseStatus.Cancelled && <WhatsAppDelivery purchaseId={order.id} />}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">

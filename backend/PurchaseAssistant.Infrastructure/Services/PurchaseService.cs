@@ -380,7 +380,6 @@ namespace PurchaseAssistant.Infrastructure.Services
 
             // Remove existing items and add updated ones
             _context.PurchaseItems.RemoveRange(order.Items);
-            _context.SupplierItemPrices.RemoveRange(await _context.SupplierItemPrices.Where(x => x.BusinessId == businessId && x.SourcePurchaseId == order.Id).ToListAsync());
             order.Items.Clear();
 
             decimal subtotal = 0;
@@ -436,7 +435,9 @@ namespace PurchaseAssistant.Infrastructure.Services
                 throw new InvalidOperationException("Only Draft or Cancelled purchase orders can be deleted.");
 
             if (order.PaidAmount > 0) throw new InvalidOperationException("A purchase with a recorded payment cannot be deleted. Keep it for the payment audit trail.");
+            if (await _context.Set<PurchaseDelivery>().AnyAsync(x => x.BusinessId == businessId && x.PurchaseId == order.Id)) throw new InvalidOperationException("Keep purchases with delivery history for the audit trail.");
 
+            _context.SupplierItemPrices.RemoveRange(await _context.SupplierItemPrices.Where(x => x.BusinessId == businessId && x.SourcePurchaseId == order.Id).ToListAsync());
             _context.PurchaseItems.RemoveRange(order.Items);
             AddActivity(order, "PurchaseDraftDeleted", new { fromStatus = order.Status.ToString() });
             _context.Purchases.Remove(order);

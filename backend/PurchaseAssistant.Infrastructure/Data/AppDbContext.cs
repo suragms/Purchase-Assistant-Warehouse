@@ -113,6 +113,7 @@ namespace PurchaseAssistant.Infrastructure.Data
             modelBuilder.Entity<UserSettings>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
             modelBuilder.Entity<StaffTask>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
             modelBuilder.Entity<ProviderCredential>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
+            modelBuilder.Entity<PurchaseDelivery>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
             // Multi-tenant Query Filters
             modelBuilder.Entity<Category>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);
             modelBuilder.Entity<CategoryType>().HasQueryFilter(e => e.BusinessId == CurrentBusinessId);

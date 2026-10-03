@@ -6,12 +6,20 @@ import { stockApi } from '../../api/stockApi';
 import type { StockItem } from '../../api/stockApi';
 import { CsvExportButton } from '../../components/CsvExportButton';
 import { stockKeys } from '../../lib/queryKeys';
+import apiClient from '../../api/apiClient';
+import { useAuthStore } from '../../stores/authStore';
+import { hasPermission } from '../../auth/hasPermission';
 
 type StockFilter = 'all' | 'low-stock' | 'out-of-stock';
 
 export default function StockList() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
+  const user = useAuthStore(s => s.user);
+  const categoryId = searchParams.get('categoryId') || undefined, supplierId = searchParams.get('supplierId') || undefined, severity = searchParams.get('severity') || undefined;
+  const filters = { categoryId, supplierId, severity };
+  const options = useQuery({ queryKey: ['stock-filter-options', user?.currentBusiness?.businessId], queryFn: async () => (await apiClient.get<{ categories: { id: string; name: string }[]; suppliers: { id: string; name: string }[] }>('/stock/filter-options')).data });
+  const changeFilter = (name: string, value: string) => { const next = new URLSearchParams(searchParams); if (value) next.set(name, value); else next.delete(name); next.set('page', '1'); setSearchParams(next); };
   const location = useLocation();
   const requestedFilter = searchParams.get('filter') ?? location.pathname.split('/').at(-1);
   const filter: StockFilter = requestedFilter === 'low-stock' || requestedFilter === 'out-of-stock' ? requestedFilter : 'all';
@@ -19,10 +27,10 @@ export default function StockList() {
 
   const queryFn =
     filter === 'low-stock'
-      ? () => stockApi.getLowStock(page, 50, search || undefined)
+      ? () => stockApi.getLowStock(page, 50, search || undefined, filters)
       : filter === 'out-of-stock'
-      ? () => stockApi.getOutOfStock(page, 50, search || undefined)
-      : () => stockApi.getItems(page, 50, search || undefined);
+      ? () => stockApi.getOutOfStock(page, 50, search || undefined, filters)
+      : () => stockApi.getItems(page, 50, search || undefined, filters);
 
   const queryKey =
     filter === 'low-stock'
@@ -31,10 +39,10 @@ export default function StockList() {
       ? stockKeys.outOfStock({ page, search })
       : stockKeys.list({ page, search });
 
-  const { data, isLoading, isError, refetch } = useQuery({ queryKey, queryFn });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: [...queryKey, filters], queryFn });
 
   const setFilter = (f: StockFilter) => {
-    setSearchParams({ filter: f, page: '1' });
+    changeFilter('filter', f);
   };
 
   const tabs: { key: StockFilter; label: string; icon?: React.ReactNode }[] = [
@@ -47,7 +55,7 @@ export default function StockList() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-[#0E4F46]">Inventory</h1>
-        <CsvExportButton kind={filter === 'low-stock' ? 'low-stock' : 'stock'} label={filter === 'low-stock' ? 'Low-stock CSV' : 'Stock CSV'} params={{ filter, search: search || undefined }} />
+        <CsvExportButton kind={filter === 'low-stock' ? 'low-stock' : 'stock'} label={filter === 'low-stock' ? 'Low-stock CSV' : 'Stock CSV'} params={{ filter, search: search || undefined, ...filters }} />
       </div>
 
       {/* Tabs */}
@@ -75,12 +83,20 @@ export default function StockList() {
           type="text"
           placeholder="Search items…"
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          maxLength={200}
+          onChange={e => { setSearch(e.target.value); changeFilter('page', '1'); }}
           className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0E4F46]/20 focus:border-[#0E4F46]"
         />
       </div>
 
       {/* Table */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="text-sm min-w-0">Category<select className="block border rounded p-2 w-full mt-1" value={categoryId ?? ''} onChange={e => changeFilter('categoryId', e.target.value)}><option value="">All categories</option>{options.data?.categories?.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+        {hasPermission(user, 'supplier.view') && <label className="text-sm min-w-0">Supplier<select className="block border rounded p-2 w-full mt-1" value={supplierId ?? ''} onChange={e => changeFilter('supplierId', e.target.value)}><option value="">All suppliers</option>{options.data?.suppliers?.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
+        <label className="text-sm">Severity<select className="block border rounded p-2 w-full mt-1" value={severity ?? ''} onChange={e => changeFilter('severity', e.target.value)}><option value="">All severities</option>{['critical', 'low', 'out', 'healthy'].map(x => <option key={x} value={x}>{x}</option>)}</select></label>
+      </div>
+      {options.isError && <p role="alert">Filter options are unavailable. Item search still works. <button className="underline" onClick={() => void options.refetch()}>Retry filters</button></p>}
+      {filter !== 'all' && hasPermission(user, 'purchase.create') && <Link className="inline-block text-teal-700 underline py-2" to="/purchases/new">Review a reorder purchase</Link>}
       {isError && <p role="alert">Stock could not be loaded. <button className="underline" onClick={() => void refetch()}>Retry</button></p>}
       <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
         {isLoading ? (
@@ -123,14 +139,14 @@ export default function StockList() {
           <div className="flex gap-2">
             <button
               disabled={page <= 1}
-              onClick={() => setSearchParams({ filter, page: String(page - 1) })}
+              onClick={() => setSearchParams({ ...Object.fromEntries(searchParams), filter, page: String(page - 1) })}
               className="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50"
             >
               Previous
             </button>
             <button
               disabled={page >= data.meta.totalPages}
-              onClick={() => setSearchParams({ filter, page: String(page + 1) })}
+              onClick={() => setSearchParams({ ...Object.fromEntries(searchParams), filter, page: String(page + 1) })}
               className="px-3 py-1.5 border rounded-lg disabled:opacity-40 hover:bg-gray-50"
             >
               Next
@@ -150,7 +166,7 @@ function StockRow({ item }: { item: StockItem }) {
     <tr className="hover:bg-gray-50 transition-colors">
       <td className="px-4 py-3">
         <p className="text-sm font-medium text-gray-900">{item.name}</p>
-        <p className="text-xs text-gray-400">{item.itemCode}{item.barcode ? ` · ${item.barcode}` : ''}</p>
+        <p className="text-xs text-gray-400">{item.itemCode}{item.barcode ? ` Â· ${item.barcode}` : ''}</p>
       </td>
       <td className="px-4 py-3 text-sm text-gray-600">
         {item.systemStock} {item.defaultUnit}

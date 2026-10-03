@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ServerDownload } from '../components/ServerDownload';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { mlApi } from '../api/mlApi';
@@ -30,6 +31,7 @@ export default function MlPage() {
     {selected && result.isPending && <p role="status">Loading prediction…</p>}
     {result.isError && <p role="alert">Predictions could not be loaded. <button className="underline" onClick={() => void result.refetch()}>Retry prediction</button></p>}
     {data && <>
+      {data.status === 'ready' && <ServerDownload path={`/exports/ml/${selected}.csv`} filename="forecast.csv" label="Export forecast CSV" params={{ horizon }} />}
       <section className="bg-white border rounded-xl p-4 space-y-2"><h2 className="font-semibold text-lg break-words">{data.itemName}</h2><p>Available stock: {number(data.currentStock)} {data.unit}</p><p role="status">{data.message}</p>
         {data.status !== 'ready' && <Link className="text-teal-700 underline" to="/operations">Record confirmed daily usage</Link>}
         {data.reorder && <div className="grid sm:grid-cols-3 gap-4 pt-3"><p>Forecast consumption<br /><strong>{number(data.forecast.reduce((sum, p) => sum + p.quantity, 0))} {data.unit}</strong></p><p>Suggested reorder<br /><strong>{number(data.reorder.quantity)} {data.unit}</strong></p><p>Stockout scenario<br /><strong>{data.reorder.riskCategory.replaceAll('_', ' ')}</strong></p><p className="sm:col-span-3 text-sm">{data.reorder.reason}</p><p>Threshold date: {data.reorder.reorderDate ?? 'Beyond this horizon'}</p>

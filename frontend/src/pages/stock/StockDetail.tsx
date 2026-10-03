@@ -313,10 +313,10 @@ function AdjustForm({
           />
         </FormField>
         <FormField label="Reason">
-          <input type="text" value={reason} onChange={e => setReason(e.target.value)} className={inputCls} placeholder="Optional" />
+          <input type="text" value={reason} onChange={e => setReason(e.target.value)} className={inputCls} placeholder="Required" required maxLength={500} />
         </FormField>
         <FormField label="Notes">
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} className={inputCls} rows={2} placeholder="Optional" />
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} className={inputCls} rows={2} maxLength={2000} placeholder="Optional" />
         </FormField>
         <div className="flex gap-3">
           <button
@@ -373,10 +373,10 @@ function PhysicalForm({
           />
         </FormField>
         <FormField label="Reason">
-          <input type="text" value={reason} onChange={e => setReason(e.target.value)} className={inputCls} placeholder="Optional" />
+          <input type="text" value={reason} onChange={e => setReason(e.target.value)} className={inputCls} placeholder="Optional" maxLength={500} />
         </FormField>
         <FormField label="Notes">
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} className={inputCls} rows={2} placeholder="Optional" />
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} className={inputCls} rows={2} maxLength={2000} placeholder="Optional" />
         </FormField>
         <div className="flex gap-3">
           <button
@@ -426,10 +426,10 @@ function ReconcileForm({
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
         <FormField label="Reason">
-          <input type="text" value={reason} onChange={e => setReason(e.target.value)} className={inputCls} placeholder="Optional" />
+          <input type="text" value={reason} onChange={e => setReason(e.target.value)} className={inputCls} placeholder="Optional" maxLength={500} />
         </FormField>
         <FormField label="Notes">
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} className={inputCls} rows={2} placeholder="Optional" />
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} className={inputCls} rows={2} maxLength={2000} placeholder="Optional" />
         </FormField>
         <div className="flex gap-3">
           <button

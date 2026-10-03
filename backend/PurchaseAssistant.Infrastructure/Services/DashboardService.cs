@@ -14,10 +14,12 @@ namespace PurchaseAssistant.Infrastructure.Services
     public class DashboardService : IDashboardService
     {
         private readonly AppDbContext _context;
+        private readonly ICurrentUserService? _user;
 
-        public DashboardService(AppDbContext context)
+        public DashboardService(AppDbContext context, ICurrentUserService? user = null)
         {
             _context = context;
+            _user = user;
         }
 
         public async Task<DashboardDto> GetDashboardDataAsync()
@@ -26,7 +28,9 @@ namespace PurchaseAssistant.Infrastructure.Services
             var today = DateTime.UtcNow.Date;
 
             // Purchase Metrics
-            var purchasesQuery = _context.Purchases.AsNoTracking();
+            var canPurchase = _user == null || _user.Role is "Owner" or "SuperAdmin" || _user.HasPermission("purchase.view");
+            var canStock = _user == null || _user.Role is "Owner" or "SuperAdmin" || _user.HasPermission("stock.view");
+            var purchasesQuery = _context.Purchases.AsNoTracking().Where(_ => canPurchase);
 
             dto.PurchaseMetrics.TodayPurchasesCount = await purchasesQuery
                 .Where(p => p.CreatedAt >= today)
@@ -49,7 +53,7 @@ namespace PurchaseAssistant.Infrastructure.Services
                 .SumAsync(p => p.GrandTotal);
 
             // Stock Metrics
-            var itemsQuery = _context.CatalogItems.AsNoTracking();
+            var itemsQuery = _context.CatalogItems.AsNoTracking().Where(i => canStock && i.IsActive);
 
             dto.StockMetrics.TotalCatalogItems = await itemsQuery.CountAsync();
             dto.StockMetrics.LowStockCount = await itemsQuery
@@ -130,7 +134,7 @@ namespace PurchaseAssistant.Infrastructure.Services
                 .ToListAsync();
 
             // Recent Stock Activity
-            dto.RecentStockActivity = await _context.StockMovements.AsNoTracking()
+            dto.RecentStockActivity = await _context.StockMovements.AsNoTracking().Where(_ => canStock)
                 .Include(m => m.CatalogItem)
                 .OrderByDescending(m => m.CreatedAt)
                 .Take(10)
