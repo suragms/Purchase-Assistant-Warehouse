@@ -5,7 +5,7 @@ import { Search, Plus, Barcode, CheckCircle } from 'lucide-react';
 import { catalogApi, type CatalogItem } from '../../api/catalogApi';
 import { barcodeKeys, catalogKeys } from '../../lib/queryKeys';
 import { useAuthStore } from '../../stores/authStore';
-import { useToast } from '../../components/ui/ToastProvider';
+import { useToast } from '../../components/ui/toastContext';
 import { PageHeader, Card, Button, Input, Badge, Skeleton, ErrorState } from '../../components/ui';
 
 export default function BarcodeManager() {

@@ -15,6 +15,9 @@ namespace PurchaseAssistant.Infrastructure.Data.Configurations
             builder.Property(e => e.DamageType).IsRequired().HasMaxLength(32);
             builder.Property(e => e.Reason).HasMaxLength(64);   // reference schema: String(64)
             builder.Property(e => e.Status).IsRequired().HasMaxLength(32);
+            // The pending -> resolved transition is conditional; use the original status in
+            // the UPDATE predicate so two reviewers cannot both resolve the same report.
+            builder.Property(e => e.Status).IsConcurrencyToken();
             builder.Property(e => e.PhotoUrl).HasColumnType("text"); // reference: Text (unlimited)
             builder.Property(e => e.Notes).HasColumnType("text");    // reference: Text (unlimited)
 

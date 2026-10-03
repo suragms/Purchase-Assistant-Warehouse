@@ -57,6 +57,7 @@ public class PurchaseParsingServiceTests
         var result = await _service.ParseAsync("Buy rice");
 
         Assert.Equal(IntentStatus.Success, result.Status);
+        Assert.NotNull(result.GeneratedAt);
         Assert.False(result.Items[0].IsAmbiguous);
     }
 }

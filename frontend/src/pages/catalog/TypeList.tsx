@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { catalogApi, type CategoryType } from '../../api/catalogApi';
 import { categoryKeys, typeKeys, catalogKeys } from '../../lib/queryKeys';
 import { PageHeader, Button, Card, Skeleton, ErrorState, ConfirmDialog, Modal, Input, Select, EmptyState } from '../../components/ui';
-import { useToast } from '../../components/ui/ToastProvider';
+import { useToast } from '../../components/ui/toastContext';
 import { useAuthStore } from '../../stores/authStore';
 
 type FormData = {

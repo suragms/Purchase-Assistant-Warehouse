@@ -14,13 +14,14 @@ export default function ReportsDashboard() {
   const [activeTab, setActiveTab] = useState<'spend' | 'summary' | 'stock' | 'comparison'>('spend');
   const [dateRange, setDateRange] = useState<'30' | '90' | '365'>('30');
   const [groupBy, setGroupBy] = useState<'day' | 'month'>('day');
+  const [reportAnchor] = useState(() => Date.now());
 
   // Keep UTC bounds stable across renders while including today's activity.
   const { startDate, endDate } = useMemo(() => {
-    const end = new Date(); const start = new Date(end);
+    const end = new Date(reportAnchor); const start = new Date(end);
     start.setUTCDate(end.getUTCDate() - Number(dateRange));
     return { startDate: start.toISOString(), endDate: end.toISOString() };
-  }, [dateRange]);
+  }, [dateRange, reportAnchor]);
 
   const { data: spendData, isLoading: spendLoading } = useQuery({
     queryKey: reportKeys.spend({ startDate, endDate, groupBy }),

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/apiClient';
 import { PageHeader } from '../components/ui';
 import { useAuthStore } from '../stores/authStore';
-import { hasPermission } from '../auth/Guards';
+import { hasPermission } from '../auth/hasPermission';
 import { purchaseErrorMessage } from '../lib/purchaseValidation';
 
 type Task = { key: string; description: string; isCompleted: boolean; notes?: string };

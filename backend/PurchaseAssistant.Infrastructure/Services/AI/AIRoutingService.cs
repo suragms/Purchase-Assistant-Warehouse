@@ -50,6 +50,11 @@ public class AIRoutingService : IAIRoutingService
             try
             {
                 var provider = await _providerFactory.GetProviderAsync(providerType, ct);
+                if (provider is IAIProviderReadiness { IsConfigured: false })
+                {
+                    _logger.LogInformation("Provider {Provider} is missing required credentials; skipping.", providerType);
+                    continue;
+                }
                 attempts++;
                 var response = await provider.SendRequestAsync(request, ct);
                 if (response.Success)

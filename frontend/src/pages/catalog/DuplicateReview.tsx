@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { catalogApi } from '../../api/catalogApi';
 import { duplicateKeys, catalogKeys } from '../../lib/queryKeys';
 import { useAuthStore } from '../../stores/authStore';
-import { useToast } from '../../components/ui/ToastProvider';
+import { useToast } from '../../components/ui/toastContext';
 import {
   PageHeader,
   Card,

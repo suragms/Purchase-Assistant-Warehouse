@@ -65,6 +65,8 @@ export const PurchaseAssistant = ({ onDraftConfirmed, disabled = false }: Purcha
       {candidate && (
         <Card className="mt-4 p-3 sm:p-4 min-w-0 border-indigo-200">
           <h3 className="font-bold text-lg mb-2">Review AI suggestions</h3>
+          <p className="text-sm text-slate-600 mb-2">Suggestions match the active business catalog. Verify every item and quantity; prices and totals remain your responsibility.</p>
+          {candidate.generatedAt && <p className="text-xs text-slate-500 mb-2">Prepared {new Date(candidate.generatedAt).toLocaleString()}</p>}
           <p className="text-sm mb-2">Supplier: {candidate.supplierName || 'Choose a supplier in the purchase form'}</p>
           {candidate.warnings?.map((warning, index) => <p key={index} className="text-sm text-amber-800 mb-2">{warning}</p>)}
           {candidate.items.length === 0 && <p>No items found. Refine your request or enter items manually.</p>}

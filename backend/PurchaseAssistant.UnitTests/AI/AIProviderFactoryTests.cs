@@ -35,6 +35,28 @@ namespace PurchaseAssistant.UnitTests.AI
             Assert.Same(provider.Object, await factory.GetProviderAsync(AIProviderType.OpenAI));
             var stub = await new StubAIProvider().SendRequestAsync(new AIRequest("Test")); Assert.False(stub.Success); Assert.Null(stub.Content);
         }
+        [Fact]
+        public void ExternalProviderWithoutKeyReportsUnconfigured()
+        {
+            using var client = new HttpClient(new CaptureHandler());
+            var provider = new OpenAIProvider(client, "  ");
+            Assert.False(((IAIProviderReadiness)provider).IsConfigured);
+        }
+        [Fact]
+        public async Task RoutingSkipsUnconfiguredProviderWithoutSendingRequest()
+        {
+            var handler = new CaptureHandler(); using var client = new HttpClient(handler);
+            var provider = new OpenAIProvider(client, "");
+            var factory = new Mock<IAIProviderFactory>();
+            factory.Setup(x => x.GetProviderAsync(AIProviderType.OpenAI, It.IsAny<CancellationToken>())).ReturnsAsync(provider);
+            factory.Setup(x => x.GetProviderAsync(It.Is<AIProviderType>(type => type != AIProviderType.OpenAI), It.IsAny<CancellationToken>())).ThrowsAsync(new NotSupportedException());
+            var service = new AIRoutingService(factory.Object, Mock.Of<Microsoft.Extensions.Logging.ILogger<AIRoutingService>>(), Microsoft.Extensions.Options.Options.Create(new AiOptions { Enabled = true }));
+
+            var result = await service.ExecuteWithFailoverAsync(new AIRequest("Test"));
+
+            Assert.False(result.Success);
+            Assert.Null(handler.Key);
+        }
         [Theory]
         [InlineData(AIProviderType.OpenAI)]
         [InlineData(AIProviderType.Gemini)]

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { canExport, downloadCsv, type CsvKind } from '../api/exportsApi';
 import { useAuthStore } from '../stores/authStore';
-import { hasPermission } from '../auth/Guards';
+import { hasPermission } from '../auth/hasPermission';
 
 export function CsvExportButton({ kind, label, params, supplierId }: { kind: CsvKind; label: string; params?: { search?: string; filter?: string; start?: string; end?: string }; supplierId?: string }) {
   const user = useAuthStore(s => s.user); const [busy, setBusy] = useState(false); const [error, setError] = useState('');

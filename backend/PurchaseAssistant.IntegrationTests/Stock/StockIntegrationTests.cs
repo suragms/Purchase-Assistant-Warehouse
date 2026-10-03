@@ -19,8 +19,7 @@ namespace PurchaseAssistant.IntegrationTests.Stock
     /// </summary>
     public partial class StockServiceIntegrationTests : IAsyncLifetime
     {
-        private const string ConnectionString =
-            "Host=localhost;Database=warehouse_erp_dev;Username=modelbridge;Password=modelbridge";
+        private static readonly string ConnectionString = DisposablePostgres.ConnectionString;
 
         private AppDbContext _context = null!;
         private StubTenant _tenant = null!;
@@ -121,7 +120,7 @@ namespace PurchaseAssistant.IntegrationTests.Stock
         }
 
         // ── Test 1: Transaction Rollback ──────────────────────────────────────────
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task Transaction_WhenExceptionOccursAfterStockUpdate_RollsBackBothStockAndMovement()
         {
             // Arrange
@@ -181,7 +180,7 @@ namespace PurchaseAssistant.IntegrationTests.Stock
         }
 
         // ── Test 2: Concurrency / Version Conflict ────────────────────────────────
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task Concurrency_WhenTwoUsersUseStaleVersion_OnlyOneSucceeds()
         {
             // Arrange
@@ -236,7 +235,7 @@ namespace PurchaseAssistant.IntegrationTests.Stock
         }
 
         // ── Test 3: Tenant Isolation ──────────────────────────────────────────────
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task TenantIsolation_BusinessA_CannotAccessBusinessBItems()
         {
             // Arrange — create a separate Business B with its own item
@@ -307,7 +306,7 @@ namespace PurchaseAssistant.IntegrationTests.Stock
         }
 
         // ── Test 4: Physical Stock Does Not Change System Stock ───────────────────
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task PhysicalStock_UpdateDoesNotChangeSystemStock()
         {
             // Arrange
@@ -344,7 +343,7 @@ namespace PurchaseAssistant.IntegrationTests.Stock
         }
 
         // ── Test 5: Available Stock Calculation ──────────────────────────────────
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task AvailableStock_IsSystemMinusReserved()
         {
             // Arrange: System=100, Reserved=20 → Available=80

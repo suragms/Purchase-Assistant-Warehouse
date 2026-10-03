@@ -87,7 +87,7 @@ public partial class StockServiceIntegrationTests
     private static void EqualSnapshots(Dictionary<string, string> before, Dictionary<string, string> after)
     { Assert.Equal(before.Keys, after.Keys); foreach (var table in before.Keys) Assert.Equal(before[table], after[table]); }
 
-    [Fact]
+    [RequiresDisposablePostgresFact]
     public async Task HistoricalPreviewMatchesRealPostgresEntitiesAndCommitsReadOnlyTransactionWithEveryColumnUnchanged()
     {
         await SeedHistoricalRelatedAsync(); var before = await HistoricalDatabaseSnapshotAsync();
@@ -103,7 +103,7 @@ public partial class StockServiceIntegrationTests
         }
         EqualSnapshots(before, await HistoricalDatabaseSnapshotAsync());
     }
-    [Theory, InlineData(Role.Owner, 200), InlineData(Role.SuperAdmin, 200), InlineData(Role.Manager, 403), InlineData(Role.Staff, 403)]
+    [RequiresDisposablePostgresTheory, InlineData(Role.Owner, 200), InlineData(Role.SuperAdmin, 200), InlineData(Role.Manager, 403), InlineData(Role.Staff, 403)]
     public async Task HistoricalPreviewHttpUsesPostgresMembershipAndMakesNoDurableWrites(Role role, int status)
     {
         await SeedHistoricalRelatedAsync(); var session = Guid.NewGuid();
@@ -121,7 +121,7 @@ public partial class StockServiceIntegrationTests
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/v1/exports/historical/preview", new { fixtureId = "valid" })).StatusCode);
         EqualSnapshots(before, await HistoricalDatabaseSnapshotAsync());
     }
-    [Fact]
+    [RequiresDisposablePostgresFact]
     public async Task HistoricalPreviewRejectsActualForeignPostgresItemSupplierAndSourceMapsWithoutLeaksOrWrites()
     {
         await SeedHistoricalRelatedAsync(); var foreign = new StockServiceIntegrationTests(); await foreign.InitializeAsync();

@@ -83,6 +83,30 @@ namespace PurchaseAssistant.Application.DTOs.Catalog
         public int LinkedItemsCount { get; set; }
     }
 
+    public class SupplierItemDto
+    {
+        public Guid Id { get; set; }
+        public Guid SupplierId { get; set; }
+        public Guid CatalogItemId { get; set; }
+        public string ItemCode { get; set; } = string.Empty;
+        public string ItemName { get; set; } = string.Empty;
+        [System.ComponentModel.DataAnnotations.MaxLength(128)]
+        public string? SupplierItemCode { get; set; }
+        public bool IsDefault { get; set; }
+        [System.ComponentModel.DataAnnotations.MaxLength(1024)]
+        public string? Notes { get; set; }
+    }
+
+    public class SupplierItemInputDto
+    {
+        public Guid CatalogItemId { get; set; }
+        [System.ComponentModel.DataAnnotations.MaxLength(128)]
+        public string? SupplierItemCode { get; set; }
+        public bool IsDefault { get; set; }
+        [System.ComponentModel.DataAnnotations.MaxLength(1024)]
+        public string? Notes { get; set; }
+    }
+
     public class BrokerDto
     {
         [System.ComponentModel.DataAnnotations.MaxLength(1024)]

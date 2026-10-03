@@ -13,7 +13,7 @@ namespace PurchaseAssistant.IntegrationTests.Dashboard
 {
     public class DashboardIntegrationTests : IAsyncLifetime
     {
-        private const string ConnectionString = "Host=localhost;Database=warehouse_erp_dev;Username=modelbridge;Password=modelbridge";
+        private static readonly string ConnectionString = DisposablePostgres.ConnectionString;
 
         private AppDbContext _context = null!;
         private IDashboardService _service = null!;
@@ -63,7 +63,7 @@ namespace PurchaseAssistant.IntegrationTests.Dashboard
             await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"Businesses\" WHERE \"Id\" = {0}", _businessId);
         }
 
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task GetDashboardData_ShouldAggregateCorrectMetrics_And_EnforceTenantIsolation()
         {
             var categoryId = Guid.NewGuid();

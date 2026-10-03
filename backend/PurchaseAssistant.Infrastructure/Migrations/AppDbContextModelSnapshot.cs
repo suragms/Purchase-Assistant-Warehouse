@@ -835,6 +835,7 @@ namespace PurchaseAssistant.Infrastructure.Migrations
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
+                        .IsConcurrencyToken()
                         .HasColumnType("character varying(32)");
 
                     b.Property<string>("Unit")

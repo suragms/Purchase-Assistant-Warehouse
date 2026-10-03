@@ -29,6 +29,14 @@ using System.Security.Cryptography.X509Certificates;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// TestServer runs without a registered Windows Event Log source or permission to create one.
+// A log-provider failure must not mask the HTTP response an endpoint test is verifying.
+if (builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Logging.ClearProviders();
+    builder.Logging.AddConsole();
+}
+
 // Add services to the container.
 builder.Services.AddControllers(options => { options.Filters.Add<OwnerFinancialResultFilter>(); options.Filters.Add<BusinessEventFilter>(); });
 builder.Services.AddSignalR();
@@ -36,6 +44,9 @@ builder.Services.AddSingleton<BusinessEvents>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 if (builder.Environment.IsProduction()) ProductionConfiguration.Validate(builder.Configuration);
+var databaseConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (!builder.Environment.IsEnvironment("Testing") && string.IsNullOrWhiteSpace(databaseConnectionString))
+    throw new InvalidOperationException("Configure ConnectionStrings:DefaultConnection with a local secret or deployment environment variable.");
 var protection = builder.Services.AddDataProtection().SetApplicationName("PurchaseAssistant");
 var keyRingPath = builder.Configuration["DataProtection:KeyRingPath"];
 if (!string.IsNullOrWhiteSpace(keyRingPath))
@@ -126,7 +137,7 @@ builder.Services.AddScoped<IAIRoutingService, AIRoutingService>();
 // Database
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+    options.UseNpgsql(databaseConnectionString!);
     options.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
 });
 

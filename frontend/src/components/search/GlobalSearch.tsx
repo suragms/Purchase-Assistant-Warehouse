@@ -64,12 +64,8 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose }) => 
   useEffect(() => {
     if (open) {
       setTimeout(() => inputRef.current?.focus(), 50);
-      setQuery('');
-      setCursor(0);
     }
   }, [open]);
-
-  useEffect(() => { setCursor(0); }, [debouncedQuery]);
 
   const navigate_to = (path: string) => {
     navigate(path);
@@ -116,7 +112,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ open, onClose }) => 
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => { setQuery(e.target.value); setCursor(0); }}
             onKeyDown={handleKeyDown}
             placeholder="Search items, suppliers, brokers, categories…"
             className="flex-1 text-sm text-[#0F172A] placeholder-gray-400 outline-none bg-transparent"

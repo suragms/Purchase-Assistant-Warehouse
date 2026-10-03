@@ -5,7 +5,7 @@ import { Plus, Edit, Trash2 } from 'lucide-react';
 import { catalogApi, type Broker } from '../../api/catalogApi';
 import { brokerKeys } from '../../lib/queryKeys';
 import { PageHeader, Button, Card, Skeleton, ErrorState, ConfirmDialog, Modal, Input, Badge } from '../../components/ui';
-import { useToast } from '../../components/ui/ToastProvider';
+import { useToast } from '../../components/ui/toastContext';
 
 export default function BrokerList() {
   const queryClient = useQueryClient();

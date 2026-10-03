@@ -130,5 +130,112 @@ namespace PurchaseAssistant.Infrastructure.Services
             _context.Suppliers.Remove(supplier);
             await _context.SaveChangesAsync(cancellationToken);
         }
+
+        public async Task<List<SupplierItemDto>> GetItemsAsync(Guid supplierId, CancellationToken cancellationToken = default)
+        {
+            await EnsureSupplierExistsAsync(supplierId, cancellationToken);
+            return await _context.SupplierItems.AsNoTracking()
+                .Where(link => link.SupplierId == supplierId)
+                .OrderBy(link => link.CatalogItem.Name)
+                .Select(link => new SupplierItemDto
+                {
+                    Id = link.Id,
+                    SupplierId = link.SupplierId,
+                    CatalogItemId = link.CatalogItemId,
+                    ItemCode = link.CatalogItem.ItemCode,
+                    ItemName = link.CatalogItem.Name,
+                    SupplierItemCode = link.SupplierItemCode,
+                    IsDefault = link.IsDefault,
+                    Notes = link.Notes
+                }).ToListAsync(cancellationToken);
+        }
+
+        public async Task<SupplierItemDto> AddItemAsync(Guid supplierId, SupplierItemInputDto dto, CancellationToken cancellationToken = default)
+        {
+            var businessId = _currentUser.BusinessId ?? throw new InvalidOperationException("BUSINESS_CONTEXT_REQUIRED");
+            await EnsureSupplierExistsAsync(supplierId, cancellationToken);
+            var item = await _context.CatalogItems.FirstOrDefaultAsync(x => x.Id == dto.CatalogItemId && x.BusinessId == businessId, cancellationToken)
+                ?? throw new KeyNotFoundException("CATALOG_ITEM_NOT_FOUND");
+
+            if (await _context.SupplierItems.AnyAsync(x => x.SupplierId == supplierId && x.CatalogItemId == item.Id, cancellationToken))
+                throw new InvalidOperationException("SUPPLIER_ITEM_EXISTS");
+
+            var link = new SupplierItem
+            {
+                BusinessId = businessId,
+                SupplierId = supplierId,
+                CatalogItemId = item.Id,
+                SupplierItemCode = NormalizeCode(dto.SupplierItemCode),
+                IsDefault = dto.IsDefault,
+                Notes = NormalizeNotes(dto.Notes)
+            };
+            if (link.IsDefault)
+                await ClearOtherDefaultsAsync(item.Id, null, cancellationToken);
+
+            _context.SupplierItems.Add(link);
+            await _context.SaveChangesAsync(cancellationToken);
+            return ToSupplierItemDto(link, item);
+        }
+
+        public async Task<SupplierItemDto> UpdateItemAsync(Guid supplierId, Guid linkId, SupplierItemInputDto dto, CancellationToken cancellationToken = default)
+        {
+            var link = await _context.SupplierItems
+                .Include(x => x.CatalogItem)
+                .FirstOrDefaultAsync(x => x.Id == linkId && x.SupplierId == supplierId, cancellationToken)
+                ?? throw new KeyNotFoundException("SUPPLIER_ITEM_NOT_FOUND");
+
+            if (dto.CatalogItemId != Guid.Empty && dto.CatalogItemId != link.CatalogItemId)
+                throw new InvalidOperationException("SUPPLIER_ITEM_CATALOG_ITEM_IMMUTABLE");
+
+            if (dto.IsDefault)
+                await ClearOtherDefaultsAsync(link.CatalogItemId, link.Id, cancellationToken);
+            link.SupplierItemCode = NormalizeCode(dto.SupplierItemCode);
+            link.IsDefault = dto.IsDefault;
+            link.Notes = NormalizeNotes(dto.Notes);
+            link.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync(cancellationToken);
+            return ToSupplierItemDto(link, link.CatalogItem);
+        }
+
+        public async Task RemoveItemAsync(Guid supplierId, Guid linkId, CancellationToken cancellationToken = default)
+        {
+            var link = await _context.SupplierItems.FirstOrDefaultAsync(x => x.Id == linkId && x.SupplierId == supplierId, cancellationToken)
+                ?? throw new KeyNotFoundException("SUPPLIER_ITEM_NOT_FOUND");
+            _context.SupplierItems.Remove(link);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        private async Task EnsureSupplierExistsAsync(Guid supplierId, CancellationToken cancellationToken)
+        {
+            if (!await _context.Suppliers.AnyAsync(x => x.Id == supplierId, cancellationToken))
+                throw new KeyNotFoundException("SUPPLIER_NOT_FOUND");
+        }
+
+        private async Task ClearOtherDefaultsAsync(Guid catalogItemId, Guid? exceptLinkId, CancellationToken cancellationToken)
+        {
+            var previousDefaults = await _context.SupplierItems
+                .Where(x => x.CatalogItemId == catalogItemId && x.IsDefault && (!exceptLinkId.HasValue || x.Id != exceptLinkId.Value))
+                .ToListAsync(cancellationToken);
+            foreach (var previous in previousDefaults)
+            {
+                previous.IsDefault = false;
+                previous.UpdatedAt = DateTime.UtcNow;
+            }
+        }
+
+        private static string? NormalizeCode(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        private static string? NormalizeNotes(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+        private static SupplierItemDto ToSupplierItemDto(SupplierItem link, CatalogItem item) => new()
+        {
+            Id = link.Id,
+            SupplierId = link.SupplierId,
+            CatalogItemId = link.CatalogItemId,
+            ItemCode = item.ItemCode,
+            ItemName = item.Name,
+            SupplierItemCode = link.SupplierItemCode,
+            IsDefault = link.IsDefault,
+            Notes = link.Notes
+        };
     }
 }

@@ -4,7 +4,7 @@ using System.Net.Http.Json;
 
 namespace PurchaseAssistant.Infrastructure.Services.AI;
 
-public class GeminiProvider : IAIProvider
+public class GeminiProvider : IAIProvider, IAIProviderReadiness
 {
     private readonly HttpClient _httpClient;
     private readonly string _apiKey;
@@ -16,6 +16,7 @@ public class GeminiProvider : IAIProvider
     }
 
     public AIProviderType ProviderType => AIProviderType.Gemini;
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(_apiKey);
 
     public async Task<AIResponse> SendRequestAsync(AIRequest request, CancellationToken ct = default)
     {

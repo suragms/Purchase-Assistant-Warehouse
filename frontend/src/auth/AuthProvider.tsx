@@ -30,7 +30,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (active && data?.data) {
           setSession(data.data.accessToken, data.data.user);
         }
-      } catch (err) {
+      } catch {
         if (active) logout();
       } finally {
         if (active) setIsLoading(false);

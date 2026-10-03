@@ -4,7 +4,7 @@ import { Plus, Edit, Trash2 } from 'lucide-react';
 import { catalogApi, type Category } from '../../api/catalogApi';
 import { categoryKeys } from '../../lib/queryKeys';
 import { PageHeader, Button, Card, Skeleton, ErrorState, ConfirmDialog, Modal, Input } from '../../components/ui';
-import { useToast } from '../../components/ui/ToastProvider';
+import { useToast } from '../../components/ui/toastContext';
 
 export default function CategoryList() {
   const queryClient = useQueryClient();

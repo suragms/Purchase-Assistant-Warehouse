@@ -27,14 +27,15 @@ public partial class PurchaseIntentEndpointTests
         await db.SaveChangesAsync();
     }
     [Theory]
-    [InlineData(Role.Owner)] [InlineData(Role.Manager)] [InlineData(Role.Admin)]
-    public async Task ExportAllFormatsAreScopedAndMoneyIsOwnerOnly(Role role)
+    [InlineData(Role.Owner)] [InlineData(Role.SuperAdmin)] [InlineData(Role.Manager)] [InlineData(Role.Admin)]
+    public async Task ExportAllFormatsAreScopedAndMoneyIsOwnerOrSuperAdminOnly(Role role)
     {
         using var factory = new Factory { MemberRole = role, Permission = "reports.view" }; using var client = factory.CreateClient();
         await SeedExport(factory); await SeedExport(factory, Guid.NewGuid()); client.DefaultRequestHeaders.Authorization = new("Bearer", Token("reports.view", true));
         var json = await client.GetAsync("/api/v1/exports/backup.json"); Assert.Equal(HttpStatusCode.OK, json.StatusCode);
         var body = await json.Content.ReadAsStringAsync(); Assert.DoesNotContain("FOREIGN PRIVATE", body);
-        Assert.Equal(role == Role.Owner, body.Contains("grandTotal")); Assert.Equal(role == Role.Owner, body.Contains("unitPrice"));
+        var seesMoney = role is Role.Owner or Role.SuperAdmin;
+        Assert.Equal(seesMoney, body.Contains("grandTotal")); Assert.Equal(seesMoney, body.Contains("unitPrice"));
         using var data = JsonDocument.Parse(body); Assert.Equal(1, data.RootElement.GetProperty("purchases").GetArrayLength());
         Assert.Equal(1.2345m, data.RootElement.GetProperty("stock")[0].GetProperty("CurrentStock").GetDecimal());
         var xlsx = await client.GetAsync("/api/v1/exports/stock.xlsx"); Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", xlsx.Content.Headers.ContentType!.MediaType);
@@ -45,7 +46,7 @@ public partial class PurchaseIntentEndpointTests
         using var pack = new ZipArchive(new MemoryStream(await archive.Content.ReadAsByteArrayAsync()));
         Assert.NotNull(pack.GetEntry("README.txt")); Assert.NotNull(pack.GetEntry("Summary.txt")); Assert.NotNull(pack.GetEntry("purchases_summary.pdf"));
         Assert.All(pack.Entries, e => Assert.DoesNotContain("..", e.FullName)); Assert.Single(pack.Entries, e => e.FullName.StartsWith("orders/"));
-        using var summary = new StreamReader(pack.GetEntry("Summary.txt")!.Open()); var totals = await summary.ReadToEndAsync(); Assert.Equal(role == Role.Owner, totals.Contains("Total INR")); if (role == Role.Owner) Assert.Contains("123.46", totals); // Reference display precision; stored JSON above retains four decimals.
+        using var summary = new StreamReader(pack.GetEntry("Summary.txt")!.Open()); var totals = await summary.ReadToEndAsync(); Assert.Equal(seesMoney, totals.Contains("Total INR")); if (seesMoney) Assert.Contains("123.46", totals); // Reference display precision; stored JSON above retains four decimals.
         using var auditScope = factory.Services.CreateScope(); var audit = await auditScope.ServiceProvider.GetRequiredService<AppDbContext>().SecurityAuditLogs.IgnoreQueryFilters().Where(x => x.EventType == "business_export").ToListAsync();
         Assert.Equal(4, audit.Count); Assert.All(audit, x => { Assert.Equal(BusinessId, x.BusinessId); Assert.Equal(UserId, x.UserId); Assert.DoesNotContain("FOREIGN", x.MetadataJson); Assert.DoesNotContain("123.4567", x.MetadataJson); });
     }

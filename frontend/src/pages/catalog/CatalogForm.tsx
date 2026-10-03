@@ -1,12 +1,12 @@
 import React, { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Save } from 'lucide-react';
 import { catalogApi, type CatalogItem } from '../../api/catalogApi';
 import { catalogKeys, categoryKeys } from '../../lib/queryKeys';
 import { PageHeader, Button, Input, Select, Card, Skeleton, ConfirmDialog, ErrorState } from '../../components/ui';
-import { useToast } from '../../components/ui/ToastProvider';
+import { useToast } from '../../components/ui/toastContext';
 
 // All fields are strings so they map cleanly to HTML inputs;
 // numeric fields are converted to numbers at submit time.
@@ -62,7 +62,7 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     reset,
     setError,
@@ -82,7 +82,8 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
     }
   });
 
-  const selectedCategoryId = watch('categoryId');
+  const selectedCategoryId = useWatch({ control, name: 'categoryId' });
+  const selectedTypeId = useWatch({ control, name: 'typeId' });
 
   const { data: types } = useQuery({
     queryKey: ['categories', selectedCategoryId, 'types'],
@@ -113,12 +114,11 @@ export default function CatalogForm({ edit = false }: { edit?: boolean }) {
   // Clear type when category changes to an incompatible one
   useEffect(() => {
     if (selectedCategoryId && types) {
-      const currentTypeId = watch('typeId');
-      if (currentTypeId && !types.find((t: { id: string; name: string }) => t.id === currentTypeId)) {
+      if (selectedTypeId && !types.find((t: { id: string; name: string }) => t.id === selectedTypeId)) {
         setValue('typeId', '');
       }
     }
-  }, [selectedCategoryId, types, setValue, watch]);
+  }, [selectedCategoryId, selectedTypeId, types, setValue]);
 
   const mutation = useMutation({
     mutationFn: (data: ItemFormValues) => {

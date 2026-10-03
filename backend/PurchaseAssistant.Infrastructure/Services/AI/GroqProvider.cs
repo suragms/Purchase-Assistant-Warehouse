@@ -5,7 +5,7 @@ using System.Net.Http.Headers;
 
 namespace PurchaseAssistant.Infrastructure.Services.AI;
 
-public class GroqProvider : IAIProvider
+public class GroqProvider : IAIProvider, IAIProviderReadiness
 {
     private readonly HttpClient _httpClient;
     private readonly string _apiKey;
@@ -17,6 +17,7 @@ public class GroqProvider : IAIProvider
     }
 
     public AIProviderType ProviderType => AIProviderType.Groq;
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(_apiKey);
 
     public async Task<AIResponse> SendRequestAsync(AIRequest request, CancellationToken ct = default)
     {

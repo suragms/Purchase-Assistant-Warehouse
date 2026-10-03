@@ -6,6 +6,7 @@ using PurchaseAssistant.Infrastructure.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
@@ -67,7 +68,8 @@ namespace PurchaseAssistant.Infrastructure.Services
             string? unit = dto.Unit;
 
             if (!PurchaseInputLimits.IsQuantityValid(dto.QtyDamaged) || dto.ItemName?.Length > 500
-                || dto.DamageType.HasValue && !Enum.IsDefined(dto.DamageType.Value) || dto.Reason.HasValue && !Enum.IsDefined(dto.Reason.Value)) throw new ArgumentException("Invalid damage details.");
+                || dto.Notes?.Length > 4000 || dto.DamageType.HasValue && !Enum.IsDefined(dto.DamageType.Value)
+                || dto.Reason.HasValue && !Enum.IsDefined(dto.Reason.Value)) throw new ArgumentException("Invalid damage details.");
             if (catalogItemId.HasValue)
             {
                 if (!await _context.PurchaseItems.AnyAsync(i => i.PurchaseOrderId == purchaseOrderId && i.CatalogItemId == catalogItemId.Value && i.BusinessId == businessId)) throw new ArgumentException("Item is not on this purchase.");
@@ -110,8 +112,26 @@ namespace PurchaseAssistant.Infrastructure.Services
                 UpdatedAt = DateTime.UtcNow
             };
 
+            await using var transaction = _context.Database.IsRelational()
+                ? await _context.Database.BeginTransactionAsync()
+                : null;
             _context.PurchaseDamageReports.Add(report);
-            await _context.SaveChangesAsync();
+            _context.SecurityAuditLogs.Add(new SecurityAuditLog
+            {
+                BusinessId = businessId,
+                UserId = _currentUser.UserId,
+                EventType = "DamageReportCreated",
+                Description = $"DamageReport:{report.Id} created",
+                MetadataJson = JsonSerializer.Serialize(new
+                {
+                    reportId = report.Id,
+                    purchaseOrderId,
+                    catalogItemId,
+                    report.DamageType,
+                    report.Reason,
+                    report.QtyDamaged
+                })
+            });
 
             if (dto.EmitNotification)
             {
@@ -119,14 +139,16 @@ namespace PurchaseAssistant.Infrastructure.Services
                 var notifications = new NotificationService(_context);
                 foreach (var recipient in recipients) await notifications.CreateNotificationAsync(businessId, recipient, PurchaseAssistant.Domain.Enums.NotificationType.VerificationRequired, "Damage reported", "A purchase damage report requires review.", "DamageReport", report.Id);
             }
+            await _context.SaveChangesAsync();
+            if (transaction != null) await transaction.CommitAsync();
             return await GetReportDtoAsync(report.Id);
         }
 
         public async Task<DamageReportDto> UpdateDamageReportStatusAsync(Guid purchaseOrderId, Guid reportId, UpdateDamageReportStatusDto dto)
         {
             // Cannot set status back to Pending
-            if (!Enum.IsDefined(dto.Status) || dto.Status == DamageStatus.Pending)
-                throw new ArgumentException("Cannot set status back to Pending.");
+            if (!Enum.IsDefined(dto.Status) || dto.Status == DamageStatus.Pending || dto.Notes?.Length > 4000)
+                throw new ArgumentException("Invalid damage report status or notes.");
 
             // Explicit ownership check: reportId must belong to this purchaseOrderId (tenant guard via query filter)
             var report = await _context.PurchaseDamageReports
@@ -135,14 +157,40 @@ namespace PurchaseAssistant.Infrastructure.Services
 
             // State transition guard: only pending reports can be updated (reference: DamageStatusPatch only valid for pending)
             if (report.Status != StatusPending)
-                throw new InvalidOperationException($"Damage report is already '{report.Status}' and cannot be updated again.");
+                throw new DbUpdateConcurrencyException("DAMAGE_REPORT_VERSION_CONFLICT");
 
             report.Status = ToSnakeCase(dto.Status.ToString());
             if (dto.Notes is not null)
                 report.Notes = dto.Notes;
             report.UpdatedAt = DateTime.UtcNow;
+            _context.SecurityAuditLogs.Add(new SecurityAuditLog
+            {
+                BusinessId = report.BusinessId,
+                UserId = _currentUser.UserId,
+                EventType = "DamageReportStatusChanged",
+                Description = $"DamageReport:{report.Id} status changed",
+                MetadataJson = JsonSerializer.Serialize(new
+                {
+                    reportId = report.Id,
+                    purchaseOrderId,
+                    previousStatus = StatusPending,
+                    newStatus = report.Status,
+                    notesUpdated = dto.Notes is not null
+                })
+            });
 
-            await _context.SaveChangesAsync();
+            await using var transaction = _context.Database.IsRelational()
+                ? await _context.Database.BeginTransactionAsync()
+                : null;
+            try
+            {
+                await _context.SaveChangesAsync();
+                if (transaction != null) await transaction.CommitAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                throw new DbUpdateConcurrencyException("DAMAGE_REPORT_VERSION_CONFLICT");
+            }
 
             return await GetReportDtoAsync(reportId);
         }

@@ -15,7 +15,7 @@ public partial class StockServiceIntegrationTests
         public IConfigurationSection GetSection(string key) => throw new NotSupportedException();
         public Microsoft.Extensions.Primitives.IChangeToken GetReloadToken() => throw new NotSupportedException();
     }
-    [Fact]
+    [RequiresDisposablePostgresFact]
     public async Task BusinessBackupsStreamPostgresDataRetainFourteenFilesAndNeverDeleteHistoryOrArbitraryPaths()
     {
         var root = Path.Combine(Path.GetTempPath(), "warehouse-backup-tests", Guid.NewGuid().ToString("N"));
@@ -41,7 +41,7 @@ public partial class StockServiceIntegrationTests
             if (Path.GetFullPath(root).StartsWith(allowed, StringComparison.OrdinalIgnoreCase)) Directory.Delete(root, true);
         }
     }
-    [Fact]
+    [RequiresDisposablePostgresFact]
     public async Task AiUsagePersistsOnlySafeMetadataAndCannotBeEdited()
     {
         var recorder = new AiUsageRecorder(_context, _user);
@@ -50,7 +50,7 @@ public partial class StockServiceIntegrationTests
         var json = JsonSerializer.Serialize(log); Assert.DoesNotContain("PRIVATE", json); Assert.DoesNotContain("private", json);
         log.Provider = "changed"; await Assert.ThrowsAsync<InvalidOperationException>(() => _context.SaveChangesAsync());
     }
-    [Fact]
+    [RequiresDisposablePostgresFact]
     public async Task BackupHistoryRejectsANonexistentBusinessForeignKey()
     {
         _context.BackupLogs.Add(new BackupLog { BusinessId = Guid.NewGuid(), Status = "fail" });

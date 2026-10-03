@@ -5,7 +5,7 @@ import { ArrowLeft, TrendingUp, ClipboardList, RefreshCw, Clock } from 'lucide-r
 import { stockApi } from '../../api/stockApi';
 import type { AdjustStockRequest, UpdatePhysicalStockRequest, ReconcileStockRequest } from '../../api/stockApi';
 import { stockKeys } from '../../lib/queryKeys';
-import { useToast } from '../../components/ui/ToastProvider';
+import { useToast } from '../../components/ui/toastContext';
 import axios from 'axios';
 
 export default function StockDetail() {

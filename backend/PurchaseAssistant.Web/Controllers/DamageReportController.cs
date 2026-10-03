@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using PurchaseAssistant.Application.DTOs.Purchase;
 using PurchaseAssistant.Application.Interfaces;
 using System;
@@ -67,6 +68,10 @@ namespace PurchaseAssistant.Web.Controllers
             catch (ArgumentException ex)
             {
                 return BadRequest(new { error = ex.Message });
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Conflict(new { error = "DAMAGE_REPORT_VERSION_CONFLICT", message = "This report has already changed. Reload and try again." });
             }
         }
 

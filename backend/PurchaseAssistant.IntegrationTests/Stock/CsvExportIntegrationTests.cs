@@ -19,7 +19,7 @@ public partial class StockServiceIntegrationTests
                 Unit = unit, KgPerUnit = kg, OrderedQuantity = 2.3456m, ReceivedQuantity = 0.4567m, UnitPrice = 100.1234m, LandingCostPerKg = 1.2345m, LineTotal = 10.5000m }] });
         await _context.SaveChangesAsync(); return (item, supplier);
     }
-    [Fact]
+    [RequiresDisposablePostgresFact]
     public async Task CsvPostgresQueriesUseCanonicalReceiptsTotalsAndDoNotWriteStock()
     {
         var data = await SeedCsvPg(); var reports = new ReportService(_context); var stock = new StockService(_context, _user);
@@ -32,7 +32,7 @@ public partial class StockServiceIntegrationTests
         Assert.Empty(await reports.GetCsvPurchaseLinesAsync(_businessId, DateTime.UtcNow.AddDays(1), DateTime.UtcNow.AddDays(2), null, default));
         Assert.Equal(12.3456m, (await _context.CatalogItems.AsNoTracking().SingleAsync(x => x.Id == data.Item.Id)).CurrentStock); Assert.Equal(0, await _context.StockMovements.CountAsync());
     }
-    [Fact]
+    [RequiresDisposablePostgresFact]
     public async Task CsvPostgresNeverIncludesOtherBusinessLinesSuppliersStockOrAggregates()
     {
         var own = await SeedCsvPg(); var foreign = Guid.NewGuid(); Guid otherItem = Guid.Empty;
@@ -63,7 +63,7 @@ public partial class StockServiceIntegrationTests
             await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"Businesses\" WHERE \"Id\" = {0}", foreign);
         }
     }
-    [Fact]
+    [RequiresDisposablePostgresFact]
     public async Task CsvPostgresMissingWeightAndUnknownConversionStayNullAndLedgerSuppliesTimestamp()
     {
         var data = await SeedCsvPg("BAG", null); var reports = new ReportService(_context); var stock = new StockService(_context, _user);

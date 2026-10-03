@@ -19,7 +19,8 @@ public record PurchaseIntentCandidateDto(
     string? SupplierName,
     List<PurchaseIntentItemCandidateDto> Items,
     string? Notes,
-    List<string>? Warnings
+    List<string>? Warnings,
+    DateTimeOffset? GeneratedAt = null
 );
 
 public record PurchaseIntentItemCandidateDto(

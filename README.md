@@ -156,15 +156,11 @@ warehouse-purchase-assistant/
    cd backend
    ```
 
-2. **Configure Database Connection**:
-   Update `backend/PurchaseAssistant.Web/appsettings.Development.json` with your PostgreSQL credentials:
-   ```json
-   {
-     "ConnectionStrings": {
-       "DefaultConnection": "Host=localhost;Database=WarehouseERP_Dev;Username=postgres;Password=your_password"
-     }
-   }
+2. **Configure Database Connection** outside the repository with .NET User Secrets:
+   ```bash
+   dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Database=WarehouseERP_Dev;Username=postgres;Password=YOUR_LOCAL_PASSWORD" --project PurchaseAssistant.Web
    ```
+   In deployed environments, provide `ConnectionStrings__DefaultConnection` through the secret manager. Database credentials are not stored in appsettings files.
 
 3. **Restore & Build**:
    ```bash
@@ -257,7 +253,8 @@ Execute backend unit and integration test suites:
 # Run all unit tests
 dotnet test backend/PurchaseAssistant.UnitTests/PurchaseAssistant.UnitTests.csproj
 
-# Run all integration tests
+# PostgreSQL tests run only against a dedicated database whose name begins with `wa_test_`.
+# Set PURCHASE_ASSISTANT_TEST_DATABASE to that database's connection string; DB-backed tests skip otherwise.
 dotnet test backend/PurchaseAssistant.IntegrationTests/PurchaseAssistant.IntegrationTests.csproj
 ```
 

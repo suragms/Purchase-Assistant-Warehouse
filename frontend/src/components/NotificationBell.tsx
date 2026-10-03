@@ -6,9 +6,10 @@ import { notificationKeys } from '../lib/queryKeys';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 export function NotificationBell() {
-  const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const [openLocationKey, setOpenLocationKey] = useState<string | null>(null);
+  const open = openLocationKey === location.key;
   const container = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const queryClient = useQueryClient();
@@ -41,11 +42,10 @@ export function NotificationBell() {
 
   const unreadCount = unreadData ?? 0;
   const notifications = listData?.data || [];
-  useEffect(() => { setOpen(false); }, [location.key]);
   useEffect(() => {
     if (!open) return;
-    const outside = (event: PointerEvent) => { if (!container.current?.contains(event.target as Node)) setOpen(false); };
-    const key = (event: KeyboardEvent) => { if (event.key === 'Escape') { setOpen(false); trigger.current?.focus(); } };
+    const outside = (event: PointerEvent) => { if (!container.current?.contains(event.target as Node)) setOpenLocationKey(null); };
+    const key = (event: KeyboardEvent) => { if (event.key === 'Escape') { setOpenLocationKey(null); trigger.current?.focus(); } };
     document.addEventListener('pointerdown', outside);
     document.addEventListener('keydown', key);
     return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', key); };
@@ -55,7 +55,7 @@ export function NotificationBell() {
     if (!n.isRead) {
       markReadMutation.mutate(n.id);
     }
-    setOpen(false);
+    setOpenLocationKey(null);
     if (n.referenceType === 'Purchase' && n.referenceId) {
       navigate(`/purchases/${n.referenceId}`);
     } else if (n.referenceType === 'CatalogItem' && n.referenceId) {
@@ -67,7 +67,7 @@ export function NotificationBell() {
     <div ref={container} className="relative">
       <button
         ref={trigger}
-        onClick={() => setOpen(!open)}
+        onClick={() => setOpenLocationKey(open ? null : location.key)}
         className="mobile-icon-button relative p-2 text-slate-600 hover:text-[#0E4F46] hover:bg-slate-100 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-[#159A8A]"
         aria-label="Notifications"
         aria-expanded={open}
@@ -147,7 +147,7 @@ export function NotificationBell() {
           <div className="p-2 border-t border-slate-100 bg-slate-50 text-center shrink-0">
             <button
               onClick={() => {
-                setOpen(false);
+                setOpenLocationKey(null);
                 navigate('/notifications');
               }}
               className="min-h-11 px-3 text-sm font-semibold text-indigo-600 hover:text-indigo-800 focus-visible:ring-2 focus-visible:ring-[#159A8A]"

@@ -5,7 +5,7 @@ import { ArrowLeft, Edit, Archive, Link as LinkIcon, AlertCircle } from 'lucide-
 import { catalogApi } from '../../api/catalogApi';
 import { catalogKeys } from '../../lib/queryKeys';
 import { PageHeader, Button, Card, Badge, Skeleton, ErrorState, ConfirmDialog } from '../../components/ui';
-import { useToast } from '../../components/ui/ToastProvider';
+import { useToast } from '../../components/ui/toastContext';
 import { PermissionGate } from '../../auth/Guards';
 import CatalogVariants from './CatalogVariants';
 

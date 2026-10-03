@@ -6,7 +6,7 @@ namespace PurchaseAssistant.IntegrationTests.Stock;
 
 public partial class StockServiceIntegrationTests
 {
-    [Fact]
+    [RequiresDisposablePostgresFact]
     public async Task DailyUsageUsesTheStockLedgerAndRejectsAStaleRepeat()
     {
         var item = await CreateItemAsync(current: 20);
@@ -18,7 +18,7 @@ public partial class StockServiceIntegrationTests
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => operations.SubmitUsageAsync(new() { Lines = [new() { CatalogItemId = item.Id, ExpectedVersion = item.RowVersion, QuantityUsed = 4 }] }));
         Assert.Equal(1, await _context.StockMovements.CountAsync(x => x.CatalogItemId == item.Id));
     }
-    [Fact]
+    [RequiresDisposablePostgresFact]
     public async Task DailyUsageValidatesTheWholeBatchBeforeWritingAndSnapshotsAreIdempotent()
     {
         var item = await CreateItemAsync(current: 20);

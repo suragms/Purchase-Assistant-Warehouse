@@ -16,8 +16,7 @@ namespace PurchaseAssistant.IntegrationTests.Purchases
 {
     public class PurchaseIntegrationTests : IAsyncLifetime
     {
-        private const string ConnectionString =
-            "Host=localhost;Database=warehouse_erp_dev;Username=modelbridge;Password=modelbridge";
+        private static readonly string ConnectionString = DisposablePostgres.ConnectionString;
 
         private AppDbContext _context = null!;
         private StubTenant _tenant = null!;
@@ -91,7 +90,7 @@ namespace PurchaseAssistant.IntegrationTests.Purchases
         private PurchaseService CreatePurchaseService() =>
             new PurchaseService(_context, _user, new StockService(_context, _user));
 
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task PostgreSqlVariantDuplicateIndexRejectsConcurrentCaseInsensitiveNames()
         {
             var service = new CatalogService(_context, new EntityNormalizationService(), _user);
@@ -104,7 +103,7 @@ namespace PurchaseAssistant.IntegrationTests.Purchases
             (await _context.StockMovements.CountAsync()).Should().Be(0);
         }
 
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task PostgreSqlVariantConcurrentUpdateKeepsWinningVersion()
         {
             var service = new CatalogService(_context, new EntityNormalizationService(), _user);
@@ -126,7 +125,7 @@ namespace PurchaseAssistant.IntegrationTests.Purchases
             Items = [new() { CatalogItemId = _catalogItemId, OrderedQuantity = 10, UnitPrice = 5 }]
         };
 
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task PostgreSqlPaymentPersistsAndRejectsReplayAndConcurrentReplacement()
         {
             var service = CreatePurchaseService(); var input = NewOrder(); input.PaymentDays = 7;
@@ -161,7 +160,7 @@ namespace PurchaseAssistant.IntegrationTests.Purchases
             public bool HasPermission(string permission) => true;
         }
 
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task PostgreSqlRefreshRotationIsAtomicAcrossConcurrentContexts()
         {
             var token = new RefreshToken { UserId = _userId, TokenHash = "test-original-hash", ExpiresAt = DateTime.UtcNow.AddDays(1) };
@@ -181,7 +180,7 @@ namespace PurchaseAssistant.IntegrationTests.Purchases
             (await _context.RefreshTokens.Where(t => t.UserId == _userId).Select(t => t.FamilyId).Distinct().CountAsync()).Should().Be(1);
         }
 
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task PostgreSqlRejectsDuplicateRefreshDigest()
         {
             var digest = new string('A', 64);
@@ -194,7 +193,7 @@ namespace PurchaseAssistant.IntegrationTests.Purchases
             Assert.Equal(1, await _context.RefreshTokens.CountAsync(t => t.UserId == _userId));
         }
 
-        [Theory]
+        [RequiresDisposablePostgresTheory]
         [InlineData("category-type")]
         [InlineData("catalog-category")]
         [InlineData("catalog-type")]
@@ -268,7 +267,7 @@ namespace PurchaseAssistant.IntegrationTests.Purchases
             item.TypeId = type; item.LastSupplierId = supplier; item.LastBrokerId = broker; return item;
         }
 
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task PostgreSqlPersistsBackendCalculatedLineDiscountAndTax()
         {
             var input = NewOrder(); input.Items[0].OrderedQuantity = 2; input.Items[0].UnitPrice = 100;
@@ -283,7 +282,7 @@ namespace PurchaseAssistant.IntegrationTests.Purchases
             (await _context.StockMovements.CountAsync()).Should().Be(0);
         }
 
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task PartialReceiptRetryWithStaleVersionCannotAddStockTwice()
         {
             var service = CreatePurchaseService();
@@ -305,7 +304,7 @@ namespace PurchaseAssistant.IntegrationTests.Purchases
             (await _context.PurchaseItems.SingleAsync()).ReceivedQuantity.Should().Be(2);
         }
 
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task SeparateContextsRejectStalePurchaseUpdate()
         {
             var created = await CreatePurchaseService().CreatePurchaseOrderAsync(NewOrder());
@@ -317,7 +316,7 @@ namespace PurchaseAssistant.IntegrationTests.Purchases
             await FluentActions.Awaiting(() => other.SaveChangesAsync()).Should().ThrowAsync<DbUpdateConcurrencyException>();
         }
 
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task DraftEditInFreshContextInsertsReplacementLinesAndRejectsStaleReplay()
         {
             var created = await CreatePurchaseService().CreatePurchaseOrderAsync(NewOrder());
@@ -345,7 +344,7 @@ namespace PurchaseAssistant.IntegrationTests.Purchases
             (await _context.StockMovements.CountAsync()).Should().Be(0);
         }
 
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task InvalidReceiptBatchRollsBackAndReleasesTransaction()
         {
             var service = CreatePurchaseService();
@@ -363,7 +362,7 @@ namespace PurchaseAssistant.IntegrationTests.Purchases
             (await _context.StockMovements.CountAsync()).Should().Be(0);
         }
 
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task PostgreSqlReportValuationUsesConfirmedCostAndIgnoresDrafts()
         {
             var service = CreatePurchaseService();
@@ -378,7 +377,7 @@ namespace PurchaseAssistant.IntegrationTests.Purchases
                 .Sum(x => x.TotalSpend).Should().Be(50);
         }
 
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task DatabaseRefusesCatalogDeletionWhenStockHistoryExists()
         {
             await new StockService(_context, _user).AdjustStockAsync(_catalogItemId, new() { QuantityDelta = 1,
@@ -389,7 +388,7 @@ namespace PurchaseAssistant.IntegrationTests.Purchases
             (await _context.CatalogItems.CountAsync()).Should().Be(1);
         }
 
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task PurchaseLifecycle_CreateConfirmReceive_CommitsStockViaStockService()
         {
             var sut = CreatePurchaseService();

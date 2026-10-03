@@ -57,6 +57,24 @@ export interface Supplier {
   linkedItemsCount: number;
 }
 
+export interface SupplierItem {
+  id: string;
+  supplierId: string;
+  catalogItemId: string;
+  itemCode: string;
+  itemName: string;
+  supplierItemCode?: string | null;
+  isDefault: boolean;
+  notes?: string | null;
+}
+
+export interface SupplierItemInput {
+  catalogItemId?: string;
+  supplierItemCode?: string;
+  isDefault: boolean;
+  notes?: string;
+}
+
 export interface Broker {
   imageUrl?: string;
   id: string;
@@ -215,6 +233,22 @@ export const catalogApi = {
 
   deleteSupplier: async (id: string): Promise<void> => {
     await apiClient.delete(`/catalog/suppliers/${id}`);
+  },
+
+  getSupplierItems: async (supplierId: string): Promise<SupplierItem[]> => {
+    const res = await apiClient.get(`/catalog/suppliers/${supplierId}/items`);
+    return res.data;
+  },
+  addSupplierItem: async (supplierId: string, input: SupplierItemInput): Promise<SupplierItem> => {
+    const res = await apiClient.post(`/catalog/suppliers/${supplierId}/items`, input);
+    return res.data;
+  },
+  updateSupplierItem: async (supplierId: string, linkId: string, input: SupplierItemInput): Promise<SupplierItem> => {
+    const res = await apiClient.put(`/catalog/suppliers/${supplierId}/items/${linkId}`, input);
+    return res.data;
+  },
+  removeSupplierItem: async (supplierId: string, linkId: string): Promise<void> => {
+    await apiClient.delete(`/catalog/suppliers/${supplierId}/items/${linkId}`);
   },
 
   // Brokers

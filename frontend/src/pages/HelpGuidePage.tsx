@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/ui';
 import { useAuthStore } from '../stores/authStore';
-import { hasPermission } from '../auth/Guards';
+import { hasPermission } from '../auth/hasPermission';
 // Adapted from the reference's static help_guide_page, using the existing web actions/routes.
 export default function HelpGuidePage() {
   const user = useAuthStore(s => s.user); const role = user?.currentBusiness?.role;

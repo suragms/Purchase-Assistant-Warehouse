@@ -79,5 +79,45 @@ namespace PurchaseAssistant.Web.Controllers
                 return Conflict(new { error = "SUPPLIER_IN_USE" });
             }
         }
+
+        [HttpGet("{id:guid}/items")]
+        [Authorize(Policy = "RequireSupplierView")]
+        public async Task<ActionResult<List<SupplierItemDto>>> GetItems(Guid id, CancellationToken cancellationToken = default)
+        {
+            try { return Ok(await _supplierService.GetItemsAsync(id, cancellationToken)); }
+            catch (KeyNotFoundException) { return NotFound(); }
+        }
+
+        [HttpPost("{id:guid}/items")]
+        [Authorize(Policy = "RequireSupplierEdit")]
+        public async Task<ActionResult<SupplierItemDto>> AddItem(Guid id, [FromBody] SupplierItemInputDto dto, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var result = await _supplierService.AddItemAsync(id, dto, cancellationToken);
+                return CreatedAtAction(nameof(GetItems), new { id }, result);
+            }
+            catch (KeyNotFoundException) { return NotFound(); }
+            catch (InvalidOperationException ex) when (ex.Message == "SUPPLIER_ITEM_EXISTS")
+            { return Conflict(new { error = "SUPPLIER_ITEM_EXISTS" }); }
+        }
+
+        [HttpPut("{id:guid}/items/{linkId:guid}")]
+        [Authorize(Policy = "RequireSupplierEdit")]
+        public async Task<ActionResult<SupplierItemDto>> UpdateItem(Guid id, Guid linkId, [FromBody] SupplierItemInputDto dto, CancellationToken cancellationToken = default)
+        {
+            try { return Ok(await _supplierService.UpdateItemAsync(id, linkId, dto, cancellationToken)); }
+            catch (KeyNotFoundException) { return NotFound(); }
+            catch (InvalidOperationException ex) when (ex.Message == "SUPPLIER_ITEM_CATALOG_ITEM_IMMUTABLE")
+            { return BadRequest(new { error = ex.Message }); }
+        }
+
+        [HttpDelete("{id:guid}/items/{linkId:guid}")]
+        [Authorize(Policy = "RequireSupplierEdit")]
+        public async Task<IActionResult> RemoveItem(Guid id, Guid linkId, CancellationToken cancellationToken = default)
+        {
+            try { await _supplierService.RemoveItemAsync(id, linkId, cancellationToken); return NoContent(); }
+            catch (KeyNotFoundException) { return NotFound(); }
+        }
     }
 }

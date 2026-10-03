@@ -15,7 +15,7 @@ namespace PurchaseAssistant.IntegrationTests.Notifications
 {
     public class NotificationIntegrationTests : IAsyncLifetime
     {
-        private const string ConnectionString = "Host=localhost;Database=warehouse_erp_dev;Username=modelbridge;Password=modelbridge";
+        private static readonly string ConnectionString = DisposablePostgres.ConnectionString;
 
         private AppDbContext _context = null!;
         private INotificationService _service = null!;
@@ -60,7 +60,7 @@ namespace PurchaseAssistant.IntegrationTests.Notifications
             await _context.Database.ExecuteSqlRawAsync("DELETE FROM \"Businesses\" WHERE \"Id\" IN ({0}, {1})", _businessId, _otherBusinessId);
         }
 
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task CreateNotification_ShouldAddUnreadNotification()
         {
             await _service.CreateNotificationAsync(_businessId, _userId, NotificationType.LowStock, "Low Stock Test", "Item X is low");
@@ -69,7 +69,7 @@ namespace PurchaseAssistant.IntegrationTests.Notifications
             count.Should().Be(1);
         }
 
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task CreateNotification_DuplicateTypeAndReference_ShouldDeduplicate()
         {
             var refId = Guid.NewGuid();
@@ -80,7 +80,7 @@ namespace PurchaseAssistant.IntegrationTests.Notifications
             count.Should().Be(1, "Second notification with same reference logic/unread state should be deduplicated");
         }
 
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task GetNotifications_ShouldEnforceUserIsolation()
         {
             await _service.CreateNotificationAsync(_businessId, _userId, NotificationType.System, "U1 Notif", "Msg for U1");
@@ -91,7 +91,7 @@ namespace PurchaseAssistant.IntegrationTests.Notifications
             u1Notifs.Data.First().UserId.Should().Be(_userId);
         }
 
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task MarkAsRead_ShouldUpdateStateAndReadAt()
         {
             await _service.CreateNotificationAsync(_businessId, _userId, NotificationType.System, "To Read", "Msg");
@@ -108,7 +108,7 @@ namespace PurchaseAssistant.IntegrationTests.Notifications
             count.Should().Be(0);
         }
 
-        [Fact]
+        [RequiresDisposablePostgresFact]
         public async Task MarkAllAsRead_ShouldUpdateAllUnread()
         {
             var ref1 = Guid.NewGuid();

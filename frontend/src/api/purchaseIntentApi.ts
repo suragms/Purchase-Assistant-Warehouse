@@ -32,6 +32,7 @@ export interface PurchaseIntentCandidateDto {
   items: PurchaseIntentItemCandidateDto[];
   notes?: string;
   warnings?: string[];
+  generatedAt?: string;
 }
 
 export const purchaseIntentApi = {

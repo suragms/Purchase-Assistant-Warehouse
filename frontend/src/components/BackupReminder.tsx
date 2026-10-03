@@ -4,11 +4,12 @@ import { useAuthStore } from '../stores/authStore';
 import { backupDeviceKey, dailyAutoBackup } from '../api/exportsApi';
 export function BackupReminder() {
   const user = useAuthStore(s => s.user); const key = backupDeviceKey(); const location = useLocation();
-  const month = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`; const [dismissed, setDismissed] = useState(false); const [error, setError] = useState('');
+  const [month] = useState(() => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`; });
+  const [dismissed, setDismissed] = useState(() => { try { return localStorage.getItem(key + ':dismissed-month') === month; } catch { return false; } });
+  const [error, setError] = useState('');
   useEffect(() => {
-    setError(''); setDismissed(false); let stopped = false;
+    let stopped = false;
     try {
-      setDismissed(localStorage.getItem(key + ':dismissed-month') === month);
       void dailyAutoBackup().catch(() => { if (!stopped) setError('Automatic backup download failed. Retry from Export & Backup.'); });
     } catch { /* Manual downloads remain available. */ }
     return () => { stopped = true; };

@@ -5,7 +5,7 @@ import apiClient from '../api/apiClient';
 import { PageHeader } from '../components/ui';
 import { SafeImage } from '../components/SafeImage';
 import { useAuthStore } from '../stores/authStore';
-import { hasPermission } from '../auth/Guards';
+import { hasPermission } from '../auth/hasPermission';
 import { purchaseErrorMessage } from '../lib/purchaseValidation';
 import { formatMoney } from '../lib/formatMoney';
 import { HistoricalPreviewPanel } from '../components/HistoricalPreviewPanel';

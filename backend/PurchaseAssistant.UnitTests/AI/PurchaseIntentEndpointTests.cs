@@ -55,6 +55,7 @@ public partial class PurchaseIntentEndpointTests
                 services.RemoveAll<IDashboardService>(); services.AddSingleton(Dashboard.Object);
                 services.RemoveAll<DbContextOptions<AppDbContext>>();
                 services.RemoveAll<IDbContextOptionsConfiguration<AppDbContext>>();
+                services.AddDataProtection().UseEphemeralDataProtectionProvider();
                 // Keep one shared in-memory store for this host.
                 var storeName = Guid.NewGuid().ToString();
                 services.AddDbContext<AppDbContext>(o => o.UseInMemoryDatabase(storeName)
@@ -406,9 +407,10 @@ public partial class PurchaseIntentEndpointTests
 
     [Theory]
     [InlineData(Role.Owner, true)]
+    [InlineData(Role.SuperAdmin, true)]
     [InlineData(Role.Manager, false)]
     [InlineData(Role.Staff, false)]
-    public async Task PurchaseHttpResponseExposesMoneyOnlyToOwner(Role role, bool visible)
+    public async Task PurchaseHttpResponseExposesMoneyOnlyToOwnerOrScopedSuperAdmin(Role role, bool visible)
     {
         using var factory = new Factory { Permission = "purchase.view", MemberRole = role };
         factory.Purchases.Setup(p => p.GetPurchaseOrderByIdAsync(It.IsAny<Guid>())).ReturnsAsync(new PurchaseOrderDto

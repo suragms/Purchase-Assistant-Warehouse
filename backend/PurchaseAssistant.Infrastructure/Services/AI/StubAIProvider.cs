@@ -3,9 +3,10 @@ using PurchaseAssistant.Application.Interfaces.AI;
 
 namespace PurchaseAssistant.Infrastructure.Services.AI;
 
-public class StubAIProvider : IAIProvider
+public class StubAIProvider : IAIProvider, IAIProviderReadiness
 {
     public AIProviderType ProviderType => AIProviderType.Stub;
+    public bool IsConfigured => false;
 
     public Task<AIResponse> SendRequestAsync(AIRequest request, CancellationToken ct = default)
     {

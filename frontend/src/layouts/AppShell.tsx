@@ -8,14 +8,15 @@ import {
   Boxes, Building2, ShoppingBag, BarChart3, Bell
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
-import { hasPermission } from '../auth/Guards';
+import { hasPermission } from '../auth/hasPermission';
 import { cn } from '../lib/cn';
 import { GlobalSearch } from '../components/search/GlobalSearch';
 import apiClient from '../api/apiClient';
-import type { AuthResponse } from '../types/auth';
+import type { AuthResponse, User } from '../types/auth';
 import { purchaseErrorMessage } from '../lib/purchaseValidation';
 import { BrandIdentity, BrandLoading } from '../components/BrandIdentity';
-import { MobileHeader, MobileNavigation, useMobileViewport } from './MobileNavigation';
+import { MobileHeader, MobileNavigation } from './MobileNavigation';
+import { useMobileViewport } from './useMobileViewport';
 
 export interface NavItem {
   label: string;
@@ -120,6 +121,48 @@ const SidebarNavItem: React.FC<{ item: NavItem; onNavigate?: () => void }> = ({ 
   );
 };
 
+interface AppSidebarProps {
+  user: User | null;
+  mobile?: boolean;
+  sessionBusy: boolean;
+  sessionError: string;
+  onSelectBusiness: (businessId: string) => Promise<void>;
+  onLogout: () => void;
+}
+
+const AppSidebar: React.FC<AppSidebarProps> = ({ user, mobile = false, sessionBusy, sessionError, onSelectBusiness, onLogout }) => (
+  <div className={cn('flex flex-col h-full', mobile ? 'w-72' : 'w-64')}>
+    <div className={cn('px-4 py-5 border-b border-white/10 shrink-0', mobile && 'pr-10')}>
+      <BrandIdentity inverse logoClassName="h-8 w-10" />
+    </div>
+    {user?.currentBusiness && (
+      <div className="px-4 py-2 border-b border-white/10">
+        <p className="text-xs text-[#8FC4BC]">Business</p>
+        <p className="text-sm font-medium text-white truncate">{user.currentBusiness.businessName}</p>
+        {user.businesses.length > 1 && <select aria-label="Business" disabled={sessionBusy} value={user.currentBusiness.businessId}
+          className="mt-2 w-full rounded border border-white/20 bg-[#0E4F46] text-sm text-white p-2" onChange={e => void onSelectBusiness(e.target.value)}>
+          {user.businesses.map(b => <option key={b.businessId} value={b.businessId}>{b.businessName}</option>)}
+        </select>}
+        {sessionError && <p role="alert" className="mt-2 text-sm text-red-200">{sessionError}</p>}
+      </div>
+    )}
+    <nav className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-1" aria-label="Main navigation">
+      {navItems.filter(item => hasPermission(user, item.permission)).map(item => ({ ...item, children: item.children?.filter(child => hasPermission(user, child.permission)) })).map(item => (
+        <SidebarNavItem key={item.label} item={item} />
+      ))}
+    </nav>
+    <div className="border-t border-white/10 px-4 py-3 flex items-center gap-3">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-white truncate">{user?.name}</p>
+        <p className="text-xs text-[#8FC4BC] truncate">{user?.currentBusiness?.role}</p>
+      </div>
+      <button onClick={onLogout} disabled={sessionBusy} className="text-[#8FC4BC] hover:text-white transition-colors" aria-label="Sign out">
+        <LogOut className="h-4 w-4" />
+      </button>
+    </div>
+  </div>
+);
+
 export const AppShell: React.FC = () => {
   const mobile = useMobileViewport();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -162,56 +205,11 @@ export const AppShell: React.FC = () => {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const Sidebar = ({ mobile = false }: { mobile?: boolean }) => (
-    <div className={cn('flex flex-col h-full', mobile ? 'w-72' : 'w-64')}>
-      {/* Logo */}
-      <div className={cn('px-4 py-5 border-b border-white/10 shrink-0', mobile && 'pr-10')}>
-        <BrandIdentity inverse logoClassName="h-8 w-10" />
-      </div>
-
-      {/* Business badge */}
-      {user?.currentBusiness && (
-        <div className="px-4 py-2 border-b border-white/10">
-          <p className="text-xs text-[#8FC4BC]">Business</p>
-          <p className="text-sm font-medium text-white truncate">{user.currentBusiness.businessName}</p>
-          {user.businesses.length > 1 && <select aria-label="Business" disabled={sessionBusy} value={user.currentBusiness.businessId}
-            className="mt-2 w-full rounded border border-white/20 bg-[#0E4F46] text-sm text-white p-2" onChange={e => void selectBusiness(e.target.value)}>
-            {user.businesses.map(b => <option key={b.businessId} value={b.businessId}>{b.businessName}</option>)}
-          </select>}
-          {sessionError && <p role="alert" className="mt-2 text-sm text-red-200">{sessionError}</p>}
-        </div>
-      )}
-
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-1" aria-label="Main navigation">
-        {navItems.filter(item => hasPermission(user, item.permission)).map(item => ({ ...item, children: item.children?.filter(child => hasPermission(user, child.permission)) })).map((item) => (
-          <SidebarNavItem key={item.label} item={item} />
-        ))}
-      </nav>
-
-      {/* User */}
-      <div className="border-t border-white/10 px-4 py-3 flex items-center gap-3">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-white truncate">{user?.name}</p>
-          <p className="text-xs text-[#8FC4BC] truncate">{user?.currentBusiness?.role}</p>
-        </div>
-        <button
-          onClick={handleLogout}
-          disabled={sessionBusy}
-          className="text-[#8FC4BC] hover:text-white transition-colors"
-          aria-label="Sign out"
-        >
-          <LogOut className="h-4 w-4" />
-        </button>
-      </div>
-    </div>
-  );
-
   return (
     <div className="app-shell flex h-screen bg-[#F7F9F6] overflow-hidden"><RealtimeUpdates />
       {/* Desktop Sidebar */}
       <div className="hidden md:flex flex-col bg-[#0E4F46] shrink-0">
-        <Sidebar />
+        <AppSidebar user={user} sessionBusy={sessionBusy} sessionError={sessionError} onSelectBusiness={selectBusiness} onLogout={handleLogout} />
       </div>
 
       {/* Main content */}
@@ -248,7 +246,7 @@ export const AppShell: React.FC = () => {
                 </div>
               }
             >
-              <BackupReminder /><Outlet />
+              <BackupReminder key={`${user?.id ?? ''}:${user?.currentBusiness?.businessId ?? ''}`} /><Outlet />
             </React.Suspense>
           </div>
         </main>
@@ -256,7 +254,7 @@ export const AppShell: React.FC = () => {
       {mobile && <MobileNavigation user={user} items={visibleItems} onSearch={() => setSearchOpen(true)} onLogout={() => void handleLogout()} onSelectBusiness={selectBusiness} sessionBusy={sessionBusy} sessionError={sessionError} />}
 
       {/* Global Search modal */}
-      <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <GlobalSearch key={searchOpen ? 'open' : 'closed'} open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );
 };

@@ -115,6 +115,6 @@ public class PurchaseParsingService(
             (!i.CatalogItemId.HasValue && !i.IsAmbiguous) || !PurchaseInputLimits.IsQuantityValid(i.RequestedQuantity));
         var status = missing ? IntentStatus.MissingInformation :
             items.Any(i => i.IsAmbiguous) ? IntentStatus.AmbiguousMatch : IntentStatus.Success;
-        return new(status, null, supplier?.Id, supplier?.Name, items, null, warnings);
+        return new(status, null, supplier?.Id, supplier?.Name, items, null, warnings, DateTimeOffset.UtcNow);
     }
 }

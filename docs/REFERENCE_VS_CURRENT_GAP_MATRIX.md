@@ -1,5 +1,27 @@
 # Reference versus current gap matrix
 
+## Current checkpoint — live runtime and physical/production boundaries
+
+2026-10-03 (Asia/Calcutta). Supersedes earlier pending local purchase/notification replay claims; prior gates, correction rules, mobile/desktop and historic evidence remain intact. [Current inventory and scheduler/recovery audit](REFERENCE_FULL_FEATURE_INVENTORY.md#current-checkpoint--disposable-runtime-and-device-qualification); [executed results and environment limits](REFERENCE_IMPLEMENTATION_STATUS.md#current-checkpoint--disposable-live-delivery-and-device-qualification).
+
+| Gap | Current evidence / result | Exact remaining limit |
+|---|---|---|
+| Live purchase delivery | VERIFIED_RUNTIME: actual isolated API/PG/SignalR, three correct permitted entity/business events, no duplicates; offline reconnect and reload UI consistency | Production/distributed/load qualification unverified |
+| Live in-app notification delivery | VERIFIED_RUNTIME: native damage producer, four invalidations, badge/read/all-read, personal lists; no polling across 32 idle seconds | Same-business valid members legitimately receive invalidation without purchase.view; foreign none. Push/WhatsApp not exercised |
+| Cross-tenant / denied purchase client | VERIFIED_RUNTIME: foreign events zero; limited purchase events zero; anonymous negotiation 401, denied purchase 403/foreign record 404 | No server policy change; production scale remains separate |
+| Draft-edit save defect | False fresh-version conflict reproduced at runtime; explicit replacement-line insertion and fresh-context/stale-replay database regression pass | Stock owner/money/schema/migrations unchanged; 58 PG tests extend 57 baseline |
+| Mobile Settings long email | VERIFIED_BROWSER: reproduced horizontal overflow, corrected fieldset minimum width inside mobile media query; new case covers three reduced-height mobile widths | Final native rerun blocked by launcher ANR; physical device unverified; desktop styles preserved |
+| Android physical / iOS physical | ANDROID_PHYSICAL_DEVICE = BLOCKED/UNVERIFIED; IOS_PHYSICAL_DEVICE = UNVERIFIED; PHYSICAL_DEVICE_UNVERIFIED | No attached phones/iOS environment |
+| Android emulator keyboard | Initial VERIFIED_RUNTIME: native Android 15 Chrome/OS keyboard and five forms, browser/system chrome, More/header/navigation | Repeated Pixel Launcher ANR blocked final native and installed-PWA qualification |
+| Installed PWA / safe-area hardware | Physical installed PWA UNVERIFIED; emulator Install app menu observed only; VERIFIED_CODE/browser inset simulation retained | No completed installation/standalone/splash proof, no physical cutout/home indicator/iOS keyboard proof |
+| Browser offline | Initial Android VERIFIED_RUNTIME: active service worker, public cache and Connection required fallback | Authenticated shell not cached; not offline stock/purchase capability |
+| Nightly trigger | NIGHTLY_TRIGGER = CODE_VERIFIED / RUNTIME_UNVERIFIED; unchanged 02:00 Asia/Kolkata; retry/recording audited | No genuine firing observed; no durable job claim/day dedupe/multi-instance lock |
+| Production recovery/migration | PRODUCTION_RECOVERY = UNVERIFIED; PRODUCTION_UNVERIFIED; local migrations/backups remain local evidence | Full database/media/encryption-key restore on approved production copy not rehearsed; native restore commit still 501 |
+| External WhatsApp | UNKNOWN/BLOCKED runtime; no external calls | Native producer/configured reference-supported infrastructure absent; key presence is not delivery proof |
+| Historical persistence | UNAVAILABLE; G01–G09 BLOCKED, G10 PARTIAL, G11 NOT_STARTED; 0 APPROVED, 16 REVIEW_REQUIRED, 14 BLOCKED rules | REQ01 trusted source package/manifest remains first; no persistence/migration/backfill/confirmation/import work |
+
+Disposable runtime cleanup VERIFIED_RUNTIME: zero rows across 28 application tables; temporary database absent after drop, accounts/audits/dependents/session/signing configuration removed and temporary API/preview/emulator stopped. Normal API was not stopped or reconfigured by this task. Final regression: **378 backend unit/endpoint, 58 PostgreSQL, 106 frontend and 200 ordinary browser PASS**, plus **one separate actual live replay PASS**; backend build zero warnings/errors, frontend build and git diff --check **PASS**. All 18 exact desktop comparisons and Owner/Manager/Staff mobile sizes pass. A first-run Staff Settings timeout is retained in the evidence; unchanged focused replay and the second full run passed, with no assertion/timeout/baseline change. Exact next task: stable native/installed-PWA and physical Android/iOS QA; unchanged nightly observation and separately authorized production-copy recovery rehearsal. Historical progress remains REQ01.
+
 ## Current checkpoint — mobile navigation and supported pending-feature audit
 
 2026-10-02. This checkpoint supersedes older mobile-navigation/Arabic-help gap claims; prior historical acceptance criteria and decisions remain intact. See [complete navigation inventory and pending-feature categories](REFERENCE_FULL_FEATURE_INVENTORY.md#mobile-navigation-and-supported-pending-feature-checkpoint) and [executed verification and limits](REFERENCE_IMPLEMENTATION_STATUS.md#current-checkpoint--mobile-navigation-and-supported-pending-features).

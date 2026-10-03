@@ -13,6 +13,8 @@ interface PermissionEditorProps {
 
 export const PermissionEditor: React.FC<PermissionEditorProps> = ({ userId, userName, onClose }) => {
   const queryClient = useQueryClient();
+  const [granted, setGranted] = React.useState<Set<string>>(new Set());
+  const [revoked, setRevoked] = React.useState<Set<string>>(new Set());
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['users', userId, 'permissions'],
@@ -23,6 +25,8 @@ export const PermissionEditor: React.FC<PermissionEditorProps> = ({ userId, user
   const updateMutation = useMutation({
     mutationFn: (vars: { grant: string[], revoke: string[] }) => usersApi.patchPermissions(userId, vars),
     onSuccess: () => {
+      setGranted(new Set());
+      setRevoked(new Set());
       queryClient.invalidateQueries({ queryKey: ['users', userId, 'permissions'] });
       // Invalidate the auth query in case we're editing ourselves and our permissions changed
       queryClient.invalidateQueries({ queryKey: ['auth'] });
@@ -30,15 +34,6 @@ export const PermissionEditor: React.FC<PermissionEditorProps> = ({ userId, user
   });
 
   // Calculate local optimistic state
-  const [granted, setGranted] = React.useState<Set<string>>(new Set());
-  const [revoked, setRevoked] = React.useState<Set<string>>(new Set());
-
-  // Reset toggles when data is fetched
-  React.useEffect(() => {
-    setGranted(new Set());
-    setRevoked(new Set());
-  }, [data]);
-
   const togglePermission = (key: string, isCurrentlyEnabled: boolean, isDefault: boolean) => {
     if (isCurrentlyEnabled) {
       if (isDefault) {

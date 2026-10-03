@@ -2,14 +2,14 @@ import { formatMoney } from '../../lib/formatMoney';
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
-import { purchaseApi, type UpsertPurchaseOrderDto, type PurchasePreviewDto, type UpsertPurchaseItemDto } from '../../api/purchaseApi';
+import { purchaseApi, type UpsertPurchaseOrderDto, type PurchasePreviewDto, type UpsertPurchaseItemDto, type PurchaseOrderDto } from '../../api/purchaseApi';
 import { supplierApi } from '../../api/supplierApi';
 import { brokerApi } from '../../api/brokerApi';
 import { catalogApi } from '../../api/catalogApi';
 import { purchaseKeys, dashboardKeys, reportKeys } from '../../lib/queryKeys';
 import { ShoppingBag, Plus, Trash2, ArrowLeft, Save } from 'lucide-react';
 import { PurchaseAssistant } from '../../components/AI/PurchaseAssistant';
-import { useToast } from '../../components/ui/ToastProvider';
+import { useToast } from '../../components/ui/toastContext';
 import { isValidQuantity, MAX_PURCHASE_VALUE, purchaseErrorMessage } from '../../lib/purchaseValidation';
 import type { PurchaseIntentItemCandidateDto } from '../../api/purchaseIntentApi';
 
@@ -19,12 +19,28 @@ interface PurchaseFormProps {
 
 export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
   const { id } = useParams<{ id: string }>();
+  const orderQuery = useQuery({
+    queryKey: purchaseKeys.detail(id!),
+    queryFn: () => purchaseApi.getPurchaseById(id!),
+    enabled: edit && !!id,
+  });
+
+  if (edit && !id) return <p role="alert" className="p-4 text-red-700">A purchase order ID is required to edit a purchase.</p>;
+  if (edit && orderQuery.isPending) return <p role="status" className="p-4">Loading purchase order…</p>;
+  if (edit && (orderQuery.isError || !orderQuery.data)) return <div role="alert" className="p-4 text-red-700">
+    <p>{purchaseErrorMessage(orderQuery.error)}</p><button type="button" className="underline" onClick={() => void orderQuery.refetch()}>Retry</button>
+  </div>;
+
+  return <PurchaseFormContent key={id ?? 'new'} edit={edit} id={id} existingOrder={edit ? orderQuery.data : undefined} />;
+}
+
+function PurchaseFormContent({ edit, id, existingOrder }: { edit: boolean; id?: string; existingOrder?: PurchaseOrderDto }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const submitting = useRef(false);
-  const orderNumber = useRef<string | undefined>(undefined);
-  const [preview, setPreview] = useState<{ data: PurchasePreviewDto; snapshot: string } | null>(null);
+  const [orderNumber, setOrderNumber] = useState<string | undefined>();
+  const [previewState, setPreview] = useState<{ data: PurchasePreviewDto; snapshot: string } | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const errorRef = useRef<HTMLParagraphElement>(null);
@@ -34,16 +50,22 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
   const [draftLabels, setDraftLabels] = useState<Record<string, string>>({});
   const [draftSupplier, setDraftSupplier] = useState<{ id: string; name: string }>();
 
-  const [supplierId, setSupplierId] = useState('');
-  const [brokerId, setBrokerId] = useState('');
-  const [notes, setNotes] = useState('');
-  const [paymentDays, setPaymentDays] = useState('');
-  const [charges, setCharges] = useState<Partial<UpsertPurchaseOrderDto>>({ freightType: 'separate', commissionMode: 'percent' });
-  const [items, setItems] = useState<UpsertPurchaseItemDto[]>([
-    { catalogItemId: '', orderedQuantity: 1, unitPrice: 0, notes: '' }
-  ]);
-
-  useEffect(() => { setPreview(null); }, [supplierId, brokerId, notes, items, paymentDays, charges]);
+  const [supplierId, setSupplierId] = useState(existingOrder?.supplierId ?? '');
+  const [brokerId, setBrokerId] = useState(existingOrder?.brokerId || '');
+  const [notes, setNotes] = useState(existingOrder?.notes || '');
+  const [paymentDays, setPaymentDays] = useState(existingOrder?.paymentDays?.toString() ?? '');
+  const [charges, setCharges] = useState<Partial<UpsertPurchaseOrderDto>>(() => existingOrder ? {
+    headerDiscountPercent: existingOrder.headerDiscountPercent, freightType: existingOrder.freightType,
+    freightAmount: existingOrder.freightAmount, deliveredCharge: existingOrder.deliveredCharge,
+    billtyCharge: existingOrder.billtyCharge, commissionMode: existingOrder.commissionMode,
+    commissionPercent: existingOrder.commissionPercent, commissionAmount: existingOrder.commissionAmount
+  } : { freightType: 'separate', commissionMode: 'percent' });
+  const [items, setItems] = useState<UpsertPurchaseItemDto[]>(() => existingOrder?.items.map(i => ({
+    catalogItemId: i.catalogItemId, unit: i.unit, freightType: i.freightType, freightAmount: i.freightAmount,
+    deliveredCharge: i.deliveredCharge, billtyCharge: i.billtyCharge, orderedQuantity: i.orderedQuantity,
+    unitPrice: i.unitPrice ?? 0, discountPercent: i.discountPercent, taxPercent: i.taxPercent,
+    kgPerUnit: i.kgPerUnit, landingCostPerKg: i.landingCostPerKg, notes: i.notes || ''
+  })) ?? [{ catalogItemId: '', orderedQuantity: 1, unitPrice: 0, notes: '' }]);
 
   const { data: suppliersData } = useQuery({
     queryKey: ['suppliers', 'list'],
@@ -59,33 +81,6 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
     queryKey: ['catalog', 'list'],
     queryFn: () => catalogApi.getItems(1, 200),
   });
-
-  const { data: existingOrder } = useQuery({
-    queryKey: purchaseKeys.detail(id!),
-    queryFn: () => purchaseApi.getPurchaseById(id!),
-    enabled: edit && !!id,
-  });
-
-  useEffect(() => {
-    if (edit && existingOrder) {
-      setSupplierId(existingOrder.supplierId);
-      setBrokerId(existingOrder.brokerId || '');
-      setNotes(existingOrder.notes || '');
-      setPaymentDays(existingOrder.paymentDays?.toString() ?? '');
-      setCharges({ headerDiscountPercent: existingOrder.headerDiscountPercent, freightType: existingOrder.freightType, freightAmount: existingOrder.freightAmount, deliveredCharge: existingOrder.deliveredCharge, billtyCharge: existingOrder.billtyCharge, commissionMode: existingOrder.commissionMode, commissionPercent: existingOrder.commissionPercent, commissionAmount: existingOrder.commissionAmount });
-      setItems(existingOrder.items.map(i => ({
-        catalogItemId: i.catalogItemId,
-        unit: i.unit ?? catalogData?.data?.find(c => c.id === i.catalogItemId)?.defaultUnit ?? 'PCS', freightType: i.freightType, freightAmount: i.freightAmount, deliveredCharge: i.deliveredCharge, billtyCharge: i.billtyCharge,
-        orderedQuantity: i.orderedQuantity,
-        unitPrice: i.unitPrice ?? 0,
-        discountPercent: i.discountPercent,
-        taxPercent: i.taxPercent,
-        kgPerUnit: i.kgPerUnit,
-        landingCostPerKg: i.landingCostPerKg,
-        notes: i.notes || ''
-      })));
-    }
-  }, [edit, existingOrder]);
 
   const handleDraftConfirmed = (candidateItems: PurchaseIntentItemCandidateDto[], inferredSupplierId?: string, inferredSupplierName?: string) => {
     if (submitting.current) return;
@@ -138,6 +133,29 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
     setItems(updated);
   };
 
+  const buildDraftDto = (currentOrderNumber = orderNumber): UpsertPurchaseOrderDto => ({
+    ...charges,
+    ...(paymentDays !== '' ? { paymentDays: Number(paymentDays) } : {}),
+    expectedVersion: edit ? existingOrder?.version : undefined,
+    orderNumber: edit ? existingOrder?.orderNumber : currentOrderNumber,
+    supplierId,
+    brokerId: brokerId || undefined,
+    notes: notes || undefined,
+    items: items.map(i => ({
+      catalogItemId: i.catalogItemId,
+      unit: i.unit ?? catalogData?.data?.find(c => c.id === i.catalogItemId)?.defaultUnit ?? 'PCS', freightType: i.freightType, freightAmount: i.freightAmount, deliveredCharge: i.deliveredCharge, billtyCharge: i.billtyCharge,
+      orderedQuantity: Number(i.orderedQuantity),
+      unitPrice: Number(i.unitPrice),
+      discountPercent: i.discountPercent,
+      taxPercent: i.taxPercent,
+      kgPerUnit: i.kgPerUnit,
+      landingCostPerKg: i.landingCostPerKg,
+      notes: i.notes || undefined
+    }))
+  });
+  const currentSnapshot = JSON.stringify(buildDraftDto());
+  const preview = previewState?.snapshot === currentSnapshot ? previewState : null;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting.current) return;
@@ -158,41 +176,23 @@ export default function PurchaseForm({ edit = false }: PurchaseFormProps) {
       return;
     }
     // Keep the same unique number after a lost response; retries cannot create a second order.
-    if (!edit && !orderNumber.current) orderNumber.current = `PO-${crypto.randomUUID()}`;
+    const draftOrderNumber = !edit && !orderNumber ? `PO-${crypto.randomUUID()}` : orderNumber;
+    if (!edit && !orderNumber) setOrderNumber(draftOrderNumber);
     if (paymentDays !== '' && (!Number.isInteger(Number(paymentDays)) || Number(paymentDays) < 0 || Number(paymentDays) > 3650)) {
       setSubmitError('Payment terms must be between 0 and 3650 days.'); return;
     }
-    const dto: UpsertPurchaseOrderDto = {
-      ...charges,
-      ...(paymentDays !== '' ? { paymentDays: Number(paymentDays) } : {}),
-      expectedVersion: edit ? existingOrder?.version : undefined,
-      orderNumber: edit ? existingOrder?.orderNumber : orderNumber.current,
-      supplierId,
-      brokerId: brokerId || undefined,
-      notes: notes || undefined,
-      items: items.map(i => ({
-        catalogItemId: i.catalogItemId,
-        unit: i.unit ?? catalogData?.data?.find(c => c.id === i.catalogItemId)?.defaultUnit ?? 'PCS', freightType: i.freightType, freightAmount: i.freightAmount, deliveredCharge: i.deliveredCharge, billtyCharge: i.billtyCharge,
-        orderedQuantity: Number(i.orderedQuantity),
-        unitPrice: Number(i.unitPrice),
-        discountPercent: i.discountPercent,
-        taxPercent: i.taxPercent,
-        kgPerUnit: i.kgPerUnit,
-        landingCostPerKg: i.landingCostPerKg,
-        notes: i.notes || undefined
-      }))
-    };
+    const dto = buildDraftDto(draftOrderNumber);
 
     submitting.current = true;
     try {
       const snapshot = JSON.stringify(dto);
-      if (!preview || preview.snapshot !== snapshot) {
+      if (!previewState || previewState.snapshot !== snapshot) {
         setPreviewing(true);
         const result = await purchaseApi.previewPurchase(dto);
         setPreview({ data: result, snapshot });
         return;
       }
-      dto.previewToken = preview.data.previewToken;
+      dto.previewToken = previewState.data.previewToken;
       if (edit && id) await updateMutation.mutateAsync(dto);
       else await createMutation.mutateAsync(dto);
     } catch (error) {

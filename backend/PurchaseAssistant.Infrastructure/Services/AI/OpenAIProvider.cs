@@ -4,7 +4,7 @@ using PurchaseAssistant.Application.Interfaces.AI;
 
 namespace PurchaseAssistant.Infrastructure.Services.AI;
 
-public class OpenAIProvider : IAIProvider
+public class OpenAIProvider : IAIProvider, IAIProviderReadiness
 {
     private readonly HttpClient _httpClient;
     private readonly string _apiKey;
@@ -16,6 +16,7 @@ public class OpenAIProvider : IAIProvider
     }
 
     public AIProviderType ProviderType => AIProviderType.OpenAI;
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(_apiKey);
 
     public async Task<AIResponse> SendRequestAsync(AIRequest request, CancellationToken ct = default)
     {
