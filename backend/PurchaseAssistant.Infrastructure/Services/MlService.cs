@@ -60,7 +60,10 @@ public class MlService(AppDbContext db, ICurrentUserService user, ArtifactStore 
         if (!await db.MlPredictionLogs.AnyAsync(x => x.BusinessId == Business && x.CatalogItemId == item.Id && x.StartDate == today && x.Horizon == horizon && x.ModelVersion == artifact.Version && x.InputVersion == data.Version, ct)) {
             db.MlPredictionLogs.Add(new() { BusinessId = Business, CatalogItemId = item.Id, UserId = user.UserId!.Value, ModelVersion = artifact.Version,
                 InputVersion = data.Version, StartDate = today, Horizon = horizon, PredictedQuantity = (decimal)sum, DailyPredictionsJson = JsonSerializer.Serialize(points), CreatedAt = now });
-            await db.SaveChangesAsync(ct);
+            try { await db.SaveChangesAsync(ct); }
+            catch (DbUpdateException ex) when (ex.InnerException is Npgsql.PostgresException { SqlState: "23505", ConstraintName: "IX_MlPredictionLogs_UniqueForecast" }) {
+                foreach (var entry in db.ChangeTracker.Entries<MlPredictionLog>().Where(x => x.State == EntityState.Added).ToList()) entry.State = EntityState.Detached;
+            }
         }
         return new(item.Id, item.Name, item.DefaultUnit, available, "ready", "Forecasts support human review; they do not create purchases or change stock.", now,
             artifact.Model.Name, artifact.Version, artifact.TrainedAt, new(artifact.TestMetrics.Mae, artifact.TestMetrics.Rmse, artifact.TestMetrics.Wape), history, points, recommendation, anomalies);

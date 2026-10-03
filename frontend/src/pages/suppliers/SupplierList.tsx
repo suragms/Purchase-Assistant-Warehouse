@@ -231,6 +231,8 @@ export default function SupplierList() {
 }
 
 function SupplierItemsDialog({ supplier, onClose }: { supplier: Supplier | null; onClose: () => void }) {
+  const user = useAuthStore(s => s.user);
+  const canEdit = hasPermission(user, 'supplier.edit'), canCatalog = hasPermission(user, 'catalog.view');
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const [itemSearch, setItemSearch] = useState('');
@@ -248,7 +250,7 @@ function SupplierItemsDialog({ supplier, onClose }: { supplier: Supplier | null;
   const catalogQuery = useQuery({
     queryKey: ['supplier-item-picker', itemSearch],
     queryFn: () => catalogApi.getItems(1, 50, itemSearch),
-    enabled: !!supplier,
+    enabled: !!supplier && canEdit && canCatalog,
   });
 
   const refresh = () => {
@@ -285,7 +287,7 @@ function SupplierItemsDialog({ supplier, onClose }: { supplier: Supplier | null;
   return (
     <Modal open={!!supplier} onClose={onClose} title={supplier ? `Items supplied by ${supplier.name}` : ''}>
       <div className="space-y-5">
-        <form onSubmit={handleAdd} className="space-y-3 rounded border border-[#E2E8E6] p-3">
+        {canEdit && canCatalog && <form onSubmit={handleAdd} className="space-y-3 rounded border border-[#E2E8E6] p-3">
           <h3 className="font-medium">Link a catalog item</h3>
           <Input label="Find item" value={itemSearch} onChange={e => setItemSearch(e.target.value)} placeholder="Search by name or item code" />
           <label className="block text-sm font-medium text-gray-700">Catalog item
@@ -300,14 +302,14 @@ function SupplierItemsDialog({ supplier, onClose }: { supplier: Supplier | null;
           {formError && <p role="alert" className="text-sm text-red-700">{formError}</p>}
           {catalogQuery.isError && <p role="alert" className="text-sm text-red-700">Could not load catalog items.</p>}
           <Button type="submit" loading={addMutation.isPending}>Link item</Button>
-        </form>
+        </form>}
 
         <section aria-label="Linked items" className="space-y-2">
           <h3 className="font-medium">Linked items</h3>
           {itemsQuery.isLoading ? <Skeleton className="h-12 w-full" /> : itemsQuery.isError ? <ErrorState onRetry={() => void itemsQuery.refetch()} /> : (
             <div className="space-y-2">
               {itemsQuery.data?.map(link => <SupplierItemRow key={link.id} link={link}
-                saving={updateMutation.isPending} removing={removeMutation.isPending}
+                saving={updateMutation.isPending} removing={removeMutation.isPending} canEdit={canEdit}
                 onSave={input => updateMutation.mutate({ link, input })}
                 onRemove={() => removeMutation.mutate(link)} />)}
               {itemsQuery.data?.length === 0 && <p className="text-sm text-gray-500">No linked items yet.</p>}
@@ -319,8 +321,8 @@ function SupplierItemsDialog({ supplier, onClose }: { supplier: Supplier | null;
   );
 }
 
-function SupplierItemRow({ link, saving, removing, onSave, onRemove }: {
-  link: SupplierItem; saving: boolean; removing: boolean;
+function SupplierItemRow({ link, saving, removing, onSave, onRemove, canEdit }: {
+  link: SupplierItem; saving: boolean; removing: boolean; canEdit: boolean;
   onSave: (input: SupplierItemInput) => void; onRemove: () => void;
 }) {
   const [supplierItemCode, setSupplierItemCode] = useState(link.supplierItemCode ?? '');
@@ -328,15 +330,15 @@ function SupplierItemRow({ link, saving, removing, onSave, onRemove }: {
   const [notes, setNotes] = useState(link.notes ?? '');
   const changed = supplierItemCode !== (link.supplierItemCode ?? '') || isDefault !== link.isDefault || notes !== (link.notes ?? '');
   return (
-    <div className="rounded border border-[#E2E8E6] p-3 space-y-2">
+    <fieldset disabled={!canEdit} className="rounded border border-[#E2E8E6] p-3 space-y-2">
       <div className="font-medium">{link.itemName} <span className="text-gray-500 font-normal">({link.itemCode})</span></div>
       <Input aria-label={`Supplier item code for ${link.itemName}`} label="Supplier item code" value={supplierItemCode} maxLength={128} onChange={e => setSupplierItemCode(e.target.value)} />
       <Textarea aria-label={`Notes for ${link.itemName}`} label="Notes" value={notes} onChange={e => setNotes(e.target.value)} />
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={isDefault} onChange={e => setIsDefault(e.target.checked)} /> Preferred supplier for this item</label>
-      <div className="flex justify-end gap-2">
+      {canEdit && <div className="flex justify-end gap-2">
         <Button variant="ghost" size="sm" className="text-red-600" disabled={removing} onClick={onRemove}><Trash2 className="h-4 w-4" /> Unlink</Button>
         <Button size="sm" disabled={!changed} loading={saving} onClick={() => onSave({ catalogItemId: link.catalogItemId, supplierItemCode, isDefault, notes })}>Save</Button>
-      </div>
-    </div>
+      </div>}
+    </fieldset>
   );
 }

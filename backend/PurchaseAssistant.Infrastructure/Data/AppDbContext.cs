@@ -88,6 +88,7 @@ namespace PurchaseAssistant.Infrastructure.Data
                 e.HasQueryFilter(x => x.BusinessId == CurrentBusinessId);
                 e.HasOne<CatalogItem>().WithMany().HasForeignKey(x => new { x.BusinessId, x.CatalogItemId }).HasPrincipalKey(x => new { x.BusinessId, x.Id }).OnDelete(DeleteBehavior.Restrict);
                 e.HasIndex(x => new { x.BusinessId, x.CatalogItemId, x.CreatedAt });
+                e.HasIndex(x => new { x.BusinessId, x.CatalogItemId, x.StartDate, x.Horizon, x.ModelVersion, x.InputVersion }).IsUnique().HasDatabaseName("IX_MlPredictionLogs_UniqueForecast");
                 e.Property(x => x.ModelVersion).HasMaxLength(160);
                 e.Property(x => x.InputVersion).HasMaxLength(64);
                 e.Property(x => x.PredictedQuantity).HasPrecision(20, 4);

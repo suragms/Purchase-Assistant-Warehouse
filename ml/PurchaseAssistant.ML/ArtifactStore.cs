@@ -31,6 +31,19 @@ public class ArtifactStore(string? directory)
     }
     public static void Validate(ModelArtifact a, Guid business, Guid item)
     {
+        if (business == Guid.Empty || item == Guid.Empty || a.Model == null || a.TrainingHistory == null || a.TrainingHistory.Count < 120
+            || a.ValidationMetrics == null || a.TestMetrics == null || a.BaselineTestMetrics == null || string.IsNullOrWhiteSpace(a.Unit) || a.Unit.Length > 20)
+            throw new InvalidDataException("Invalid model metadata.");
+        static bool MetricsValid(ErrorMetrics m) => m != null && m.Count == 30 && m.NonZeroCount is >= 0 and <= 30
+            && double.IsFinite(m.Mae) && m.Mae >= 0 && double.IsFinite(m.Rmse) && m.Rmse >= 0
+            && (m.Wape == null || (double.IsFinite(m.Wape.Value) && m.Wape >= 0)) && (m.Mape == null || (double.IsFinite(m.Mape.Value) && m.Mape >= 0))
+            && (m.RSquared == null || (double.IsFinite(m.RSquared.Value) && m.RSquared <= 1));
+        if (a.Version != a.DatasetVersion + "-" + a.FeatureVersion + "-" + a.Model.Name || a.TrainedAt == default
+            || DateOnly.FromDateTime(a.TrainedAt) <= a.TrainingEnd || a.ValidationStart != a.TrainingHistory[^60].Date
+            || a.ValidationEnd != a.TrainingHistory[^31].Date || a.TestStart != a.TrainingHistory[^30].Date || a.TestEnd != a.TrainingEnd
+            || !MetricsValid(a.TestMetrics) || !MetricsValid(a.BaselineTestMetrics) || a.ValidationMetrics.Count != 3
+            || ForecastModel.Candidates.Any(x => !a.ValidationMetrics.TryGetValue(x, out var m) || !MetricsValid(m))
+            || a.QualityAccepted != (a.TestMetrics.Mae <= a.BaselineTestMetrics.Mae * 1.1 + 1e-8)) throw new InvalidDataException("Invalid model evaluation metadata.");
         if (a.SchemaVersion != 1 || a.BusinessId != business || a.ItemId != item || a.FeatureVersion != UsageData.FeatureVersion
             || !ForecastModel.Candidates.Contains(a.Model.Name) || a.TrainingHistory.Count is < 120 or > 730
             || a.DatasetVersion != UsageData.Fingerprint(a.TrainingHistory) || !double.IsFinite(a.AbsoluteError90) || a.AbsoluteError90 < 0

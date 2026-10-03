@@ -233,6 +233,7 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<StockItemDto> UpdatePhysicalStockAsync(Guid itemId, UpdatePhysicalStockRequestDto request)
         {
+            if (request.Reason?.Length > 500 || request.Notes?.Length > 2000) throw new ArgumentException("Reason or notes exceed the allowed length.");
             if (request.PhysicalStock < 0 || request.PhysicalStock > PurchaseInputLimits.MaxValue || decimal.Round(request.PhysicalStock, 4) != request.PhysicalStock)
                 throw new ArgumentException("Enter a nonnegative physical count within range, with at most four decimal places.");
             await using var tx = _context.Database.CurrentTransaction == null
@@ -280,6 +281,7 @@ namespace PurchaseAssistant.Infrastructure.Services
 
         public async Task<StockItemDto> ReconcileStockAsync(Guid itemId, ReconcileStockRequestDto request)
         {
+            if (request.Reason?.Length > 500 || request.Notes?.Length > 2000) throw new ArgumentException("Reason or notes exceed the allowed length.");
             await using var tx = _context.Database.CurrentTransaction == null
                 ? await _context.Database.BeginTransactionAsync() : null;
 
